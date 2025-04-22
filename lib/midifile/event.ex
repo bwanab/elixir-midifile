@@ -1,5 +1,5 @@
 defmodule Midifile.Event do
-  use Bitwise
+  import Bitwise
 
   defstruct symbol: :off,
     delta_time: 0,

@@ -1,6 +1,6 @@
 defmodule Midifile.Varlen do
 
-  use Bitwise
+  import Bitwise
 
   @moduledoc """
   Reads and writes varlen values.
@@ -44,7 +44,7 @@ defmodule Midifile.Varlen do
   end
 
   def write(i) do
-    exit("Value " ++ i ++ " is too big for a variable length number")
+    raise "Value #{i} is too big for a variable length number"
   end
 
 end

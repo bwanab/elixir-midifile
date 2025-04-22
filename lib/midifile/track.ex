@@ -8,7 +8,10 @@ defmodule Midifile.Track do
   def instrument(%Midifile.Track{events: nil}), do: ""
   def instrument(%Midifile.Track{events: []}),  do: ""
   def instrument(%Midifile.Track{events: list})  do
-    Enum.find(list, %Event{}, &(&1.symbol == :instrument)).bytes
+    case Enum.find(list, &(&1.symbol == :instrument)) do
+      %Event{bytes: bytes} -> bytes
+      nil -> ""
+    end
   end
 
   def quantize(track, n) do
