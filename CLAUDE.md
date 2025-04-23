@@ -9,6 +9,12 @@ mix test test/event_test.exs:45  # Run a specific test at line 45
 mix format                     # Format code with Elixir's built-in formatter
 ```
 
+## Git Configuration
+Always push changes to the bwanab fork, NOT to the original repo:
+```bash
+git push fork <branch-name>    # Correct: Push to bwanab's fork
+```
+
 ## Code Style
 - Modules: `PascalCase` (e.g., `Midifile.Sequence`)
 - Functions/Variables: `snake_case` (e.g., `read_track`, `delta_time`) 
