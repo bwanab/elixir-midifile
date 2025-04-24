@@ -4,7 +4,42 @@ defmodule Midifile.Filter do
   """
 
   @doc """
-  Filters events in a track by removing events that match the given criteria.
+  Filters events in a track by applying a predicate function.
+
+  ## Parameters
+    * `sequence` - A `Midifile.Sequence` struct
+    * `track_number` - Zero-based index of the track to filter
+    * `predicate` - A function that takes an event and returns true if the event should be kept
+
+  ## Returns
+    * A new sequence with the filtered track
+  """
+  def filter_events_by_predicate(sequence, track_number, predicate) do
+    # Get the tracks list
+    tracks = sequence.tracks
+
+    # Validate track number is in range
+    if track_number < 0 or track_number >= length(tracks) do
+      raise ArgumentError,
+            "Track number #{track_number} is out of range (0-#{length(tracks) - 1})"
+    end
+
+    # Get the target track
+    track = Enum.at(tracks, track_number)
+
+    # Filter the events
+    filtered_events = Enum.filter(track.events, predicate)
+
+    # Create a new track with filtered events
+    filtered_track = %{track | events: filtered_events}
+
+    # Replace the track in the sequence and return the new sequence
+    updated_tracks = List.replace_at(tracks, track_number, filtered_track)
+    %{sequence | tracks: updated_tracks}
+  end
+
+  @doc """
+  Filters events in a track by removing events that match the given event type.
 
   ## Parameters
     * `sequence` - A `Midifile.Sequence` struct
@@ -15,25 +50,6 @@ defmodule Midifile.Filter do
     * A new sequence with the filtered track
   """
   def filter_events(sequence, track_number, event_type) do
-    # Get the tracks list
-    tracks = sequence.tracks
-
-    # Validate track number is in range
-    if track_number < 0 or track_number >= length(tracks) do
-      raise ArgumentError, "Track number #{track_number} is out of range (0-#{length(tracks) - 1})"
-    end
-
-    # Get the target track
-    track = Enum.at(tracks, track_number)
-    
-    # Filter the events
-    filtered_events = Enum.filter(track.events, &(&1.symbol != event_type))
-    
-    # Create a new track with filtered events
-    filtered_track = %{track | events: filtered_events}
-    
-    # Replace the track in the sequence and return the new sequence
-    updated_tracks = List.replace_at(tracks, track_number, filtered_track)
-    %{sequence | tracks: updated_tracks}
+    filter_events_by_predicate(sequence, track_number, &(&1.symbol != event_type))
   end
 end
