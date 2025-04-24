@@ -27,15 +27,38 @@ defmodule Midifile.Filter do
     # Get the target track
     track = Enum.at(tracks, track_number)
 
-    # Filter the events
-    filtered_events = Enum.filter(track.events, predicate)
+    # Process the events, preserving delta times
+    processed_events = preserve_delta_times(track.events, predicate)
 
     # Create a new track with filtered events
-    filtered_track = %{track | events: filtered_events}
+    filtered_track = %{track | events: processed_events}
 
     # Replace the track in the sequence and return the new sequence
     updated_tracks = List.replace_at(tracks, track_number, filtered_track)
     %{sequence | tracks: updated_tracks}
+  end
+
+  @doc """
+  Filters events while preserving the total delta time.
+  
+  When removing events, their delta_time values are added to the next 
+  non-filtered event to maintain the correct timing.
+  """
+  def preserve_delta_times(events, predicate) do
+    {filtered_events, _} = 
+      Enum.reduce(events, {[], 0}, fn event, {acc, accumulated_delta} ->
+        if predicate.(event) do
+          # Keep this event, add any accumulated delta to it
+          updated_event = %{event | delta_time: event.delta_time + accumulated_delta}
+          {[updated_event | acc], 0}
+        else
+          # Skip this event, accumulate its delta time
+          {acc, accumulated_delta + event.delta_time}
+        end
+      end)
+      
+    # Return events in the original order
+    Enum.reverse(filtered_events)
   end
 
   @doc """
