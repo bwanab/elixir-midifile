@@ -34,6 +34,7 @@ defmodule Midifile.UtilTest do
       case orig.note do
         40 -> assert trans.note == 38  # Snare mapping
         35 -> assert trans.note == 36  # Bass drum mapping
+        44 -> assert trans.note == 42  # Pedal high-hat mapping
         other -> assert trans.note == other  # Other notes should remain unchanged
       end
     end)

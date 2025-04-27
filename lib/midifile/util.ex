@@ -9,6 +9,7 @@ defmodule Midifile.Util do
   Currently maps:
   - Snare (40) -> 38
   - Bass drum (35) -> 36
+  - Pedal high-hat (44) -> 42
   
   ## Parameters
     * `input_path` - Path to the input MIDI file
@@ -41,6 +42,7 @@ defmodule Midifile.Util do
           sequence
           |> map_drum_note(track_idx, 40, 38) # Snare 40 -> 38
           |> map_drum_note(track_idx, 35, 36) # Bass drum 35 -> 36
+          |> map_drum_note(track_idx, 44, 42) # Pedal high-hat 44 -> 42
 
         # Get the processed track
         Enum.at(processed_sequence.tracks, track_idx)
