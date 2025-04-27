@@ -4,6 +4,74 @@ defmodule Midifile.Util do
   """
 
   @doc """
+  Identifies instruments used in a MIDI file based on a sound mapping.
+  
+  ## Parameters
+    * `map_file_path` - Path to the CSV file with sound mappings (Key#,Note,Sound Name)
+    * `midi_file_path` - Path to the MIDI file to analyze
+    
+  ## Returns
+    * A list of tuples in the format {key_number, note, sound_name} sorted by key_number
+  """
+  def identify_instruments(map_file_path, midi_file_path) do
+    # Read the MIDI file
+    sequence = Midifile.read(midi_file_path)
+    
+    # Collect all unique note numbers from the sequence
+    unique_notes = 
+      sequence.tracks
+      |> Enum.flat_map(fn track -> 
+        track.events
+        |> Enum.filter(&Midifile.Event.note?/1)
+        |> Enum.map(&Midifile.Event.note/1)
+      end)
+      |> Enum.uniq()
+      |> Enum.sort()
+    
+    # Read the mapping file
+    mappings = read_instrument_mappings(map_file_path)
+    
+    # Match notes to mappings and return results
+    unique_notes
+    |> Enum.map(fn note ->
+      Enum.find(mappings, {note, "Note #{note}", "Unknown"}, fn {key_number, _, _} -> 
+        key_number == note
+      end)
+    end)
+    |> Enum.sort_by(fn {key_number, _, _} -> key_number end)
+  end
+  
+  @doc """
+  Reads and parses a CSV file containing instrument sound mappings.
+  
+  ## Parameters
+    * `map_file_path` - Path to the CSV file with instrument mappings
+    
+  ## Returns
+    * A list of tuples in the format {key_number, note, sound_name}
+  """
+  def read_instrument_mappings(map_file_path) do
+    map_file_path
+    |> File.read!()
+    |> String.split("\n")
+    |> Enum.drop(1)  # Skip the header row
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.map(fn line ->
+      [key_str, note, sound_name] = 
+        line
+        |> String.split(",")
+        |> Enum.map(&String.trim/1)
+      
+      {
+        String.to_integer(key_str),
+        note,
+        sound_name
+      }
+    end)
+  end
+
+  @doc """
   Maps drum notes to different values based on a CSV mapping file.
   
   The CSV file should have a header row and 3 columns: Item, From, To.
