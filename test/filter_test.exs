@@ -136,7 +136,7 @@ defmodule Midifile.FilterTest do
     assert processed_start_times == expected_start_times, "Start times should be preserved for non-removed notes"
   end
   
-  test "process_notes changes note pitch correctly" do
+  test "process_notes changes note pitch correctly with relative shift" do
     # Create a test sequence with multiple notes
     events = [
       %Midifile.Event{symbol: :on, delta_time: 10, bytes: [0x90, 60, 100]},  # Note on C4 (to change)
@@ -145,11 +145,11 @@ defmodule Midifile.FilterTest do
       %Midifile.Event{symbol: :off, delta_time: 50, bytes: [0x81, 64, 0]}    # Note off E4 (to keep)
     ]
     
-    # Process notes - change C4 (note 60) to C5 (note 72)
+    # Process notes - shift C4 (note 60) up by 12 semitones to C5 (note 72)
     processed_events = Filter.process_note_events(
       events, 
       fn note -> note == 60 end,    # Match only C4
-      {:pitch, 72}                  # Change to C5
+      {:pitch, 12}                  # Shift up one octave
     )
     
     # Check that both note on and note off events were changed to C5
@@ -176,6 +176,46 @@ defmodule Midifile.FilterTest do
     
     assert note_off != nil, "Note off event should exist"
     assert Midifile.Event.note(note_off) == 72, "Note off pitch should be C5 (72)"
+  end
+  
+  test "process_notes handles pitch shifting with note range clamping" do
+    # Create a test sequence with a note at the edge of MIDI range
+    events = [
+      %Midifile.Event{symbol: :on, delta_time: 10, bytes: [0x90, 120, 100]},  # High note (to shift beyond range)
+      %Midifile.Event{symbol: :on, delta_time: 20, bytes: [0x91, 5, 100]},    # Low note (to shift below range)
+      %Midifile.Event{symbol: :off, delta_time: 40, bytes: [0x80, 120, 0]},   # High note off
+      %Midifile.Event{symbol: :off, delta_time: 50, bytes: [0x81, 5, 0]}      # Low note off
+    ]
+    
+    # Process high notes - shift up by 20 semitones (should clamp to 127)
+    high_processed_events = Filter.process_note_events(
+      events, 
+      fn note -> note == 120 end,  # Match high note
+      {:pitch, 20}                 # Shift up by 20 semitones (beyond MIDI range)
+    )
+    
+    # Process low notes - shift down by 20 semitones (should clamp to 0)
+    low_processed_events = Filter.process_note_events(
+      events, 
+      fn note -> note == 5 end,    # Match low note
+      {:pitch, -20}                # Shift down by 20 semitones (below MIDI range)
+    )
+    
+    # Verify high note is clamped to 127
+    high_note_on = Enum.find(high_processed_events, fn e -> 
+      e.symbol == :on && Midifile.Event.channel(e) == 0 
+    end)
+    
+    assert high_note_on != nil, "High note on event should exist"
+    assert Midifile.Event.note(high_note_on) == 127, "High note should be clamped to max MIDI value (127)"
+    
+    # Verify low note is clamped to 0
+    low_note_on = Enum.find(low_processed_events, fn e -> 
+      e.symbol == :on && Midifile.Event.channel(e) == 1 
+    end)
+    
+    assert low_note_on != nil, "Low note on event should exist"
+    assert Midifile.Event.note(low_note_on) == 0, "Low note should be clamped to min MIDI value (0)"
   end
   
   test "process_notes changes note velocity correctly" do

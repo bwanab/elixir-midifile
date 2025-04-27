@@ -23,12 +23,20 @@ defmodule Midifile.Filter do
   
   ### Transpose notes
   ```elixir
-  # Transpose all E notes (note number 64) up to G (note number 67) in track 0
+  # Transpose all E notes (note number 64) up a minor third (3 semitones) in track 0
   transposed_sequence = Midifile.Filter.process_notes(
     sequence, 
     0,                        # track number
     fn note -> note == 64 end,  # match only E notes
-    {:pitch, 67}              # change pitch to G
+    {:pitch, 3}               # shift up by 3 semitones (E to G)
+  )
+  
+  # Transpose all notes down an octave (-12 semitones) in track 1
+  transposed_sequence = Midifile.Filter.process_notes(
+    sequence, 
+    1,                        # track number
+    fn _note -> true end,     # match all notes
+    {:pitch, -12}             # shift down by 12 semitones (one octave)
   )
   ```
   
@@ -129,7 +137,8 @@ defmodule Midifile.Filter do
     * `note_predicate` - A function that takes a note number and returns true if the note should be processed
     * `operation` - The operation to perform on matching notes:
         * `:remove` - Remove the note completely
-        * `{:pitch, new_pitch}` - Change the note's pitch to the specified value
+        * `{:pitch, semitone_shift}` - Shift the note's pitch by the specified number of semitones
+          (positive for up, negative for down)
         * `{:velocity, new_velocity}` - Change the note's velocity (note_on only)
 
   ## Returns
@@ -180,12 +189,16 @@ defmodule Midifile.Filter do
             
           # For pitch change operations on matching notes
           is_tuple(operation) && elem(operation, 0) == :pitch && matching_note ->
-            new_pitch = elem(operation, 1)
+            semitone_shift = elem(operation, 1)
             # Get current note number
-            [status, _note, velocity] = event.bytes
+            [status, note, velocity] = event.bytes
+            # Calculate new pitch by adding the semitone shift
+            new_pitch = note + semitone_shift
+            # Ensure new_pitch is within MIDI note range (0-127)
+            clamped_pitch = max(0, min(127, new_pitch))
             # Create updated event with new pitch
             updated_event = %{event | 
-              bytes: [status, new_pitch, velocity],
+              bytes: [status, clamped_pitch, velocity],
               delta_time: event.delta_time + accumulated_delta
             }
             {[updated_event | acc], 0}
