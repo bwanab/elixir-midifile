@@ -4,14 +4,15 @@ defmodule Midifile.Util do
   """
 
   @doc """
-  Maps drum notes to different values.
+  Maps drum notes to different values based on a CSV mapping file.
   
-  Currently maps:
-  - Snare (40) -> 38
-  - Bass drum (35) -> 36
-  - Pedal high-hat (44) -> 42
+  The CSV file should have a header row and 3 columns: Item, From, To.
+  - Item: Description of what is being mapped (e.g., "Snare")
+  - From: MIDI note value to map from (e.g., 40)
+  - To: MIDI note value to map to (e.g., 38)
   
   ## Parameters
+    * `map_file_path` - Path to the CSV file with drum mappings
     * `input_path` - Path to the input MIDI file
     * `output_path` - (Optional) Path to the output MIDI file. If not provided,
       defaults to the input filename with "_trans" appended before the extension.
@@ -19,7 +20,7 @@ defmodule Midifile.Util do
   ## Returns
     * The path to the output file
   """
-  def map_drums(input_path, output_path \\ nil) do
+  def map_drums(map_file_path, input_path, output_path \\ nil) do
     # Set default output path if none provided
     output_file =
       if output_path do
@@ -34,15 +35,17 @@ defmodule Midifile.Util do
     # Read the input MIDI file - our Reader now handles format 0 files
     sequence = Midifile.read(input_path)
     
+    # Read and parse the mapping CSV file
+    mappings = read_mappings(map_file_path)
+    
     # Process all tracks in the sequence
     updated_tracks =
       Enum.map(0..(length(sequence.tracks) - 1), fn track_idx ->
-        # Process each track with note transformations
+        # Apply each mapping in the CSV file to the track
         processed_sequence =
-          sequence
-          |> map_drum_note(track_idx, 40, 38) # Snare 40 -> 38
-          |> map_drum_note(track_idx, 35, 36) # Bass drum 35 -> 36
-          |> map_drum_note(track_idx, 44, 42) # Pedal high-hat 44 -> 42
+          Enum.reduce(mappings, sequence, fn {_item, from_note, to_note}, seq ->
+            map_drum_note(seq, track_idx, from_note, to_note)
+          end)
 
         # Get the processed track
         Enum.at(processed_sequence.tracks, track_idx)
@@ -56,6 +59,36 @@ defmodule Midifile.Util do
 
     # Return the output file path
     output_file
+  end
+  
+  @doc """
+  Reads and parses a CSV file containing drum mappings.
+  
+  ## Parameters
+    * `map_file_path` - Path to the CSV file with drum mappings
+    
+  ## Returns
+    * A list of tuples in the format {item, from_note, to_note}
+  """
+  def read_mappings(map_file_path) do
+    map_file_path
+    |> File.read!()
+    |> String.split("\n")
+    |> Enum.drop(1)  # Skip the header row
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.map(fn line ->
+      [item, from_str, to_str] = 
+        line
+        |> String.split(",")
+        |> Enum.map(&String.trim/1)
+      
+      {
+        item,
+        String.to_integer(from_str),
+        String.to_integer(to_str)
+      }
+    end)
   end
   
   @doc """

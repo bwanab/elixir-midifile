@@ -1,7 +1,8 @@
 defmodule Midifile.UtilTest do
   use ExUnit.Case
   
-  test "map_drums correctly remaps drum notes in folk1.mid" do
+  test "map_drums correctly remaps drum notes using CSV mapping file" do
+    map_file_path = "Yamaha_QY10_map.csv"
     input_path = "test/folk1.mid"
     output_path = "test/folk1_trans.mid"
     
@@ -10,8 +11,8 @@ defmodule Midifile.UtilTest do
       File.rm!(output_path)
     end
     
-    # Run the map_drums function
-    result_path = Midifile.Util.map_drums(input_path, output_path)
+    # Run the map_drums function with the CSV file
+    result_path = Midifile.Util.map_drums(map_file_path, input_path, output_path)
     
     # Assert the output file was created
     assert File.exists?(output_path)
@@ -28,15 +29,15 @@ defmodule Midifile.UtilTest do
     original_notes = extract_all_notes(original)
     transformed_notes = extract_all_notes(transformed)
     
+    # Read expected mappings from CSV
+    mappings = Midifile.Util.read_mappings(map_file_path)
+    mapping_map = Enum.into(mappings, %{}, fn {_item, from, to} -> {from, to} end)
+    
     # Verify mappings
     Enum.zip(original_notes, transformed_notes)
     |> Enum.each(fn {orig, trans} ->
-      case orig.note do
-        40 -> assert trans.note == 38  # Snare mapping
-        35 -> assert trans.note == 36  # Bass drum mapping
-        44 -> assert trans.note == 42  # Pedal high-hat mapping
-        other -> assert trans.note == other  # Other notes should remain unchanged
-      end
+      expected_note = Map.get(mapping_map, orig.note, orig.note)
+      assert trans.note == expected_note
     end)
     
     # Clean up - delete the output file
