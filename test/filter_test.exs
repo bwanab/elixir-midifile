@@ -278,4 +278,67 @@ defmodule Midifile.FilterTest do
     
     assert remaining_notes == [64], "Only note E4 should remain"
   end
+  
+  test "process_notes works with Note struct predicates" do
+    # Create a sequence with note pairs of varying durations
+    sequence = %Midifile.Sequence{
+      format: 1,
+      division: 480,  # Standard MIDI ticks per quarter note
+      tracks: [
+        %Midifile.Track{
+          events: [
+            # Long note - C4 with duration 480 ticks (quarter note)
+            %Midifile.Event{symbol: :on, delta_time: 0, bytes: [0x90, 60, 80]},    # C4 note_on
+            # Short note - D4 with duration 120 ticks (1/16 note)
+            %Midifile.Event{symbol: :on, delta_time: 0, bytes: [0x90, 62, 100]},   # D4 note_on
+            %Midifile.Event{symbol: :off, delta_time: 120, bytes: [0x80, 62, 0]},  # D4 note_off
+            # Medium note - E4 with duration 240 ticks (1/8 note)
+            %Midifile.Event{symbol: :on, delta_time: 0, bytes: [0x90, 64, 70]},    # E4 note_on
+            %Midifile.Event{symbol: :off, delta_time: 240, bytes: [0x80, 64, 0]},  # E4 note_off
+            %Midifile.Event{symbol: :off, delta_time: 120, bytes: [0x80, 60, 0]}   # C4 note_off
+          ]
+        }
+      ]
+    }
+    
+    # Filter out short notes (less than 200 ticks duration)
+    filtered_sequence = Filter.process_notes(
+      sequence,
+      0,
+      fn note -> note.duration < 200 end,  # Match notes shorter than 200 ticks
+      :remove  # Remove these notes
+    )
+    
+    filtered_events = List.first(filtered_sequence.tracks).events
+    
+    # Should have 4 events left (C4 note_on/off and E4 note_on/off)
+    assert length(filtered_events) == 4
+    
+    # Check that D4 is gone and C4/E4 remain
+    remaining_notes = filtered_events
+                      |> Enum.filter(&(&1.symbol in [:on, :off]))
+                      |> Enum.map(&(Midifile.Event.note(&1)))
+                      |> Enum.uniq()
+                      |> Enum.sort()
+    
+    assert remaining_notes == [60, 64], "Only C4 and E4 should remain (D4 should be removed)"
+    
+    # Filter by velocity
+    velocity_filtered = Filter.process_notes(
+      sequence,
+      0,
+      fn note -> note.velocity < 75 end,  # Match notes with low velocity
+      :remove  # Remove these notes
+    )
+    
+    velocity_events = List.first(velocity_filtered.tracks).events
+    
+    # Should have removed C4 and E4 (low velocity), leaving only D4
+    remaining_vel_notes = velocity_events
+                         |> Enum.filter(&(&1.symbol in [:on, :off]))
+                         |> Enum.map(&(Midifile.Event.note(&1)))
+                         |> Enum.uniq()
+    
+    assert remaining_vel_notes == [62], "Only D4 should remain (velocity 100)"
+  end
 end

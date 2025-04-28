@@ -27,6 +27,8 @@ defmodule Midifile.Mixfile do
   end
 
   defp deps do
-    []
+    [
+      {:music_prims, path: "../music_prims"}
+    ]
   end
 end
