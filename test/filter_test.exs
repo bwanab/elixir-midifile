@@ -71,7 +71,7 @@ defmodule Midifile.FilterTest do
     assert Enum.at(filtered_events, 2).delta_time == 60 + 50
 
     # Verify start times are correctly preserved
-    original_start_times = Event.start_times(events)
+    original_start_times = Event.start_times(events)  # This is fine as it's for filter_events_preserves_timing
     filtered_start_times = Event.start_times(filtered_events)
 
     # Only compare start times for events that weren't filtered out
@@ -90,33 +90,45 @@ defmodule Midifile.FilterTest do
 
   test "process_notes removes note pairs correctly" do
     # Create a test sequence with multiple notes
-    events = [
-      # Note on C4 (to remove)
-      %Midifile.Event{symbol: :on, delta_time: 10, bytes: [0x90, 60, 100]},
-      # Note on E4 (to keep)
-      %Midifile.Event{symbol: :on, delta_time: 20, bytes: [0x91, 64, 100]},
-      # Note on G4 (to keep)
-      %Midifile.Event{symbol: :on, delta_time: 30, bytes: [0x90, 67, 100]},
-      # Note off C4 (to remove)
-      %Midifile.Event{symbol: :off, delta_time: 40, bytes: [0x80, 60, 0]},
-      # Note off E4 (to keep)
-      %Midifile.Event{symbol: :off, delta_time: 50, bytes: [0x81, 64, 0]},
-      # Note off G4 (to keep)
-      %Midifile.Event{symbol: :off, delta_time: 60, bytes: [0x80, 67, 0]}
-    ]
+    sequence = %Midifile.Sequence{
+      format: 1,
+      division: 480,
+      tracks: [
+        %Midifile.Track{
+          events: [
+            # Note on C4 (to remove)
+            %Midifile.Event{symbol: :on, delta_time: 10, bytes: [0x90, 60, 100]},
+            # Note on E4 (to keep)
+            %Midifile.Event{symbol: :on, delta_time: 20, bytes: [0x91, 64, 100]},
+            # Note on G4 (to keep)
+            %Midifile.Event{symbol: :on, delta_time: 30, bytes: [0x90, 67, 100]},
+            # Note off C4 (to remove)
+            %Midifile.Event{symbol: :off, delta_time: 40, bytes: [0x80, 60, 0]},
+            # Note off E4 (to keep)
+            %Midifile.Event{symbol: :off, delta_time: 50, bytes: [0x81, 64, 0]},
+            # Note off G4 (to keep)
+            %Midifile.Event{symbol: :off, delta_time: 60, bytes: [0x80, 67, 0]}
+          ]
+        }
+      ]
+    }
 
     # Calculate the original total duration
-    original_duration = Enum.sum(Enum.map(events, fn e -> e.delta_time end))
+    original_duration = Enum.sum(Enum.map(List.first(sequence.tracks).events, fn e -> e.delta_time end))
 
     # Process notes - remove only C4 (note 60)
-    processed_events =
-      Filter.process_note_events(
-        events,
+    processed_sequence =
+      Filter.process_notes(
+        sequence,
+        0,
         # Match only C4
         fn note -> note == 60 end,
         # Remove the note
         :remove
       )
+    
+    # Get the processed events
+    processed_events = List.first(processed_sequence.tracks).events
 
     # Calculate the new total duration
     processed_duration = Enum.sum(Enum.map(processed_events, fn e -> e.delta_time end))
@@ -137,7 +149,7 @@ defmodule Midifile.FilterTest do
     assert Enum.sort(remaining_notes) == [64, 67], "Only notes E4 and G4 should remain"
 
     # Verify start times are correctly preserved
-    original_start_times = Event.start_times(events)
+    original_start_times = Event.start_times(List.first(sequence.tracks).events)
     processed_start_times = Event.start_times(processed_events)
 
     # Expected start times (removing note 60 events)
@@ -158,26 +170,38 @@ defmodule Midifile.FilterTest do
 
   test "process_notes changes note pitch correctly with relative shift" do
     # Create a test sequence with multiple notes
-    events = [
-      # Note on C4 (to change)
-      %Midifile.Event{symbol: :on, delta_time: 10, bytes: [0x90, 60, 100]},
-      # Note on E4 (to keep)
-      %Midifile.Event{symbol: :on, delta_time: 20, bytes: [0x91, 64, 100]},
-      # Note off C4 (to change)
-      %Midifile.Event{symbol: :off, delta_time: 40, bytes: [0x80, 60, 0]},
-      # Note off E4 (to keep)
-      %Midifile.Event{symbol: :off, delta_time: 50, bytes: [0x81, 64, 0]}
-    ]
+    sequence = %Midifile.Sequence{
+      format: 1,
+      division: 480,
+      tracks: [
+        %Midifile.Track{
+          events: [
+            # Note on C4 (to change)
+            %Midifile.Event{symbol: :on, delta_time: 10, bytes: [0x90, 60, 100]},
+            # Note on E4 (to keep)
+            %Midifile.Event{symbol: :on, delta_time: 20, bytes: [0x91, 64, 100]},
+            # Note off C4 (to change)
+            %Midifile.Event{symbol: :off, delta_time: 40, bytes: [0x80, 60, 0]},
+            # Note off E4 (to keep)
+            %Midifile.Event{symbol: :off, delta_time: 50, bytes: [0x81, 64, 0]}
+          ]
+        }
+      ]
+    }
 
     # Process notes - shift C4 (note 60) up by 12 semitones to C5 (note 72)
-    processed_events =
-      Filter.process_note_events(
-        events,
+    processed_sequence =
+      Filter.process_notes(
+        sequence,
+        0,
         # Match only C4
         fn note -> note == 60 end,
         # Shift up one octave
         {:pitch, 12}
       )
+      
+    # Get the processed events
+    processed_events = List.first(processed_sequence.tracks).events
 
     # Check that both note on and note off events were changed to C5
     c5_events =
@@ -210,36 +234,50 @@ defmodule Midifile.FilterTest do
 
   test "process_notes handles pitch shifting with note range clamping" do
     # Create a test sequence with a note at the edge of MIDI range
-    events = [
-      # High note (to shift beyond range)
-      %Midifile.Event{symbol: :on, delta_time: 10, bytes: [0x90, 120, 100]},
-      # Low note (to shift below range)
-      %Midifile.Event{symbol: :on, delta_time: 20, bytes: [0x91, 5, 100]},
-      # High note off
-      %Midifile.Event{symbol: :off, delta_time: 40, bytes: [0x80, 120, 0]},
-      # Low note off
-      %Midifile.Event{symbol: :off, delta_time: 50, bytes: [0x81, 5, 0]}
-    ]
+    sequence = %Midifile.Sequence{
+      format: 1,
+      division: 480,
+      tracks: [
+        %Midifile.Track{
+          events: [
+            # High note (to shift beyond range)
+            %Midifile.Event{symbol: :on, delta_time: 10, bytes: [0x90, 120, 100]},
+            # Low note (to shift below range)
+            %Midifile.Event{symbol: :on, delta_time: 20, bytes: [0x91, 5, 100]},
+            # High note off
+            %Midifile.Event{symbol: :off, delta_time: 40, bytes: [0x80, 120, 0]},
+            # Low note off
+            %Midifile.Event{symbol: :off, delta_time: 50, bytes: [0x81, 5, 0]}
+          ]
+        }
+      ]
+    }
 
     # Process high notes - shift up by 20 semitones (should clamp to 127)
-    high_processed_events =
-      Filter.process_note_events(
-        events,
+    high_processed_sequence =
+      Filter.process_notes(
+        sequence,
+        0,
         # Match high note
         fn note -> note == 120 end,
         # Shift up by 20 semitones (beyond MIDI range)
         {:pitch, 20}
       )
+      
+    high_processed_events = List.first(high_processed_sequence.tracks).events
 
     # Process low notes - shift down by 20 semitones (should clamp to 0)
-    low_processed_events =
-      Filter.process_note_events(
-        events,
+    low_processed_sequence =
+      Filter.process_notes(
+        sequence,
+        0,
         # Match low note
         fn note -> note == 5 end,
         # Shift down by 20 semitones (below MIDI range)
         {:pitch, -20}
       )
+      
+    low_processed_events = List.first(low_processed_sequence.tracks).events
 
     # Verify high note is clamped to 127
     high_note_on =
@@ -266,26 +304,38 @@ defmodule Midifile.FilterTest do
 
   test "process_notes changes note velocity correctly" do
     # Create a test sequence with multiple notes
-    events = [
-      # Note on C4 (to change velocity)
-      %Midifile.Event{symbol: :on, delta_time: 10, bytes: [0x90, 60, 100]},
-      # Note on E4 (to keep)
-      %Midifile.Event{symbol: :on, delta_time: 20, bytes: [0x91, 64, 100]},
-      # Note off C4
-      %Midifile.Event{symbol: :off, delta_time: 40, bytes: [0x80, 60, 0]},
-      # Note off E4
-      %Midifile.Event{symbol: :off, delta_time: 50, bytes: [0x81, 64, 0]}
-    ]
+    sequence = %Midifile.Sequence{
+      format: 1,
+      division: 480,
+      tracks: [
+        %Midifile.Track{
+          events: [
+            # Note on C4 (to change velocity)
+            %Midifile.Event{symbol: :on, delta_time: 10, bytes: [0x90, 60, 100]},
+            # Note on E4 (to keep)
+            %Midifile.Event{symbol: :on, delta_time: 20, bytes: [0x91, 64, 100]},
+            # Note off C4
+            %Midifile.Event{symbol: :off, delta_time: 40, bytes: [0x80, 60, 0]},
+            # Note off E4
+            %Midifile.Event{symbol: :off, delta_time: 50, bytes: [0x81, 64, 0]}
+          ]
+        }
+      ]
+    }
 
     # Process notes - change C4 (note 60) velocity to 64
-    processed_events =
-      Filter.process_note_events(
-        events,
+    processed_sequence =
+      Filter.process_notes(
+        sequence,
+        0,
         # Match only C4
         fn note -> note == 60 end,
         # Change velocity to 64
         {:velocity, 64}
       )
+      
+    # Get the processed events
+    processed_events = List.first(processed_sequence.tracks).events
 
     # Verify note on event velocity is changed
     note_on =
@@ -308,26 +358,38 @@ defmodule Midifile.FilterTest do
 
   test "process_notes handles note_on with zero velocity" do
     # Create a test sequence using note_on with zero velocity as note_off
-    events = [
-      # Note on C4 (to remove)
-      %Midifile.Event{symbol: :on, delta_time: 10, bytes: [0x90, 60, 100]},
-      # Note on E4 (to keep)
-      %Midifile.Event{symbol: :on, delta_time: 20, bytes: [0x91, 64, 100]},
-      # Note off C4 via note_on with velocity 0
-      %Midifile.Event{symbol: :on, delta_time: 40, bytes: [0x90, 60, 0]},
-      # Note off E4 via note_on with velocity 0
-      %Midifile.Event{symbol: :on, delta_time: 50, bytes: [0x91, 64, 0]}
-    ]
+    sequence = %Midifile.Sequence{
+      format: 1,
+      division: 480,
+      tracks: [
+        %Midifile.Track{
+          events: [
+            # Note on C4 (to remove)
+            %Midifile.Event{symbol: :on, delta_time: 10, bytes: [0x90, 60, 100]},
+            # Note on E4 (to keep)
+            %Midifile.Event{symbol: :on, delta_time: 20, bytes: [0x91, 64, 100]},
+            # Note off C4 via note_on with velocity 0
+            %Midifile.Event{symbol: :on, delta_time: 40, bytes: [0x90, 60, 0]},
+            # Note off E4 via note_on with velocity 0
+            %Midifile.Event{symbol: :on, delta_time: 50, bytes: [0x91, 64, 0]}
+          ]
+        }
+      ]
+    }
 
     # Process notes - remove only C4 (note 60)
-    processed_events =
-      Filter.process_note_events(
-        events,
+    processed_sequence =
+      Filter.process_notes(
+        sequence,
+        0,
         # Match only C4
         fn note -> note == 60 end,
         # Remove the note
         :remove
       )
+      
+    # Get the processed events
+    processed_events = List.first(processed_sequence.tracks).events
 
     # Check the result
     assert length(processed_events) == 2, "Should have 2 events after removing C4 note pair"

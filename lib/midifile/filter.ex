@@ -189,35 +189,55 @@ defmodule Midifile.Filter do
     # Get the target track
     track = Enum.at(tracks, track_number)
 
-    # Check if the predicate function accepts a Note struct
+    # Check if this predicate is from our test suite or expects MIDI note numbers directly
+    test_predicate = 
+      try do
+        # Try to call the predicate with a MIDI note number directly
+        test_midi_note = 60  # Middle C
+        note_predicate.(test_midi_note)
+        true  # If we get here, the predicate accepts MIDI note numbers
+      rescue
+        _ -> false  # If an error occurred, the predicate doesn't work with integers
+      end
+      
     processed_track =
-      case Function.info(note_predicate, :arity) do
-        {:arity, 1} ->
-          try do
-            # Try to call with a placeholder Note struct to see if it works with Notes
-            # If it fails, assume it's a legacy predicate that expects just note numbers
-            test_note = Note.new({:c, 4}, duration: 1, velocity: 100)
-            note_predicate.(test_note)
+      if test_predicate do
+        # It's a predicate that works with MIDI note numbers directly - use the legacy approach
+        final_processed_events = process_note_events(track.events, note_predicate, operation)
+        %{track | events: final_processed_events}
+      else 
+        # Try the enhanced approach with Note structs
+        case Function.info(note_predicate, :arity) do
+          {:arity, 1} ->
+            try do
+              # Try to call with a placeholder Note struct to see if it works with Notes
+              test_note = Note.new({:c, 4}, duration: 1, velocity: 100)
+              note_predicate.(test_note)
 
-            # If we get here, the function accepts Note structs
-            {processed_events, note_data} = mark_matching_notes(track.events, note_predicate)
+              # If we get here, the function accepts Note structs, use the enhanced approach
+              {processed_events, note_data} = mark_matching_notes(track.events, note_predicate)
+              final_processed_events = process_note_events_enhanced(processed_events, operation, note_data)
+              %{track | events: final_processed_events}
+            rescue
+              _ ->
+                # If the predicate call fails, use the enhanced approach with an adapter
+                
+                # Create an adapter that extracts the MIDI note number from Note struct
+                adapted_predicate = fn note_struct ->
+                  midi_note = Note.note_to_midi(note_struct).note_number
+                  note_predicate.(midi_note)
+                end
+                
+                {processed_events, note_data} = mark_matching_notes(track.events, adapted_predicate)
+                final_processed_events = process_note_events_enhanced(processed_events, operation, note_data)
+                %{track | events: final_processed_events}
+            end
 
-            final_processed_events =
-              process_note_events_enhanced(processed_events, operation, note_data)
-
-            # Create a new track with processed events
+          # If arity is not 1, use the legacy approach
+          _ ->
+            final_processed_events = process_note_events(track.events, note_predicate, operation)
             %{track | events: final_processed_events}
-          rescue
-            _ ->
-              # If the predicate call fails, assume it's a legacy predicate
-              processed_events = process_note_events(track.events, note_predicate, operation)
-              %{track | events: processed_events}
-          end
-
-        # If arity is not 1, use the legacy version
-        _ ->
-          processed_events = process_note_events(track.events, note_predicate, operation)
-          %{track | events: processed_events}
+        end
       end
 
     # Replace the track in the sequence and return the new sequence
@@ -225,19 +245,19 @@ defmodule Midifile.Filter do
     %{sequence | tracks: updated_tracks}
   end
 
+
   @doc """
-  Processes note events while handling note pairs (note_on/note_off) properly.
-
-  This function supports removing notes or modifying their properties, preserving
-  delta times when notes are removed.
-
-  This version is for backward compatibility with tests and existing code.
+  Process note events using only MIDI note numbers for backward compatibility.
+  
+  This version is kept for backward compatibility with tests and existing code.
+  It works with MIDI note numbers rather than Note structs.
   """
   def process_note_events(events, note_predicate, operation) do
     # First, identify and mark note_on events that match the predicate
-    {marked_events, _note_map} = mark_matching_notes_legacy(events, note_predicate)
-
-    # Process events based on the operation and marked status
+    {marked_events, _} = mark_matching_notes_legacy(events, note_predicate)
+    
+    # Process events based on the operation and marked status - similar to process_note_events_enhanced
+    # but duplicated here to avoid issues with Note structs and velocity functions
     {processed_events, _accumulated_delta} =
       Enum.reduce(marked_events, {[], 0}, fn {event, matching_note}, {acc, accumulated_delta} ->
         cond do
@@ -285,16 +305,18 @@ defmodule Midifile.Filter do
             {[updated_event | acc], 0}
         end
       end)
-
+      
     # Return events in the original order
     Enum.reverse(processed_events)
   end
-
+  
   @doc """
-  Enhanced version of process_note_events that works with Note structs.
+  Processes MIDI note events based on the specified operation.
 
-  This function supports removing notes or modifying their properties based on advanced
-  criteria like note duration, preserving delta times when notes are removed.
+  This function works with Note structs to support advanced operations on MIDI notes,
+  including filtering by properties like duration and velocity.
+  It properly handles note pairs (note_on and note_off) and preserves
+  delta times when notes are removed.
 
   Takes a list of marked events (events with matching flag) and note data for velocity functions.
   """
@@ -394,7 +416,8 @@ defmodule Midifile.Filter do
     Enum.reverse(processed_events)
   end
 
-  # Original version of mark_matching_notes for backward compatibility
+
+  # Legacy version of mark_matching_notes that works with MIDI note numbers
   #
   # Returns a tuple containing:
   # - A list of {event, matching} tuples, where matching is true if the event is part of a note 
@@ -421,7 +444,7 @@ defmodule Midifile.Filter do
           # Add event to marked list
           {[{event, matching} | marked_events], new_note_map}
 
-        # Handle note_off events or note_on with zero velocity (which is equivalent to note_off)
+        # Handle note_off events
         %{symbol: :off} = event ->
           # Extract note and channel information
           channel = Midifile.Event.channel(event)
@@ -463,8 +486,11 @@ defmodule Midifile.Filter do
     end)
     |> then(fn {marked_events, note_map} -> {Enum.reverse(marked_events), note_map} end)
   end
-
-  # Enhanced version that uses Note structs
+  
+  # Processes events to mark those that match the predicate function
+  #
+  # This function creates Note structs for each MIDI note and uses the provided
+  # predicate to determine which notes should be processed.
   #
   # Returns a tuple containing:
   # - A list of {event, matching} tuples, where matching is true if the event is part of a note 
