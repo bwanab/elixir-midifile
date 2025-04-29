@@ -15,7 +15,18 @@ defmodule SequenceTest do
       ]
     }
 
-    {:ok, %{seq: %Sequence{division: 480, conductor_track: ct, tracks: [t, t, t]}, track: t}}
+    # Create a sequence with the new time_basis structure using metrical time
+    metrical_seq = %Sequence{
+      time_basis: :metrical_time,
+      ticks_per_quarter_note: 480,
+      smpte_format: nil,
+      ticks_per_frame: nil,
+      division: 480,  # For backwards compatibility
+      conductor_track: ct, 
+      tracks: [t, t, t]
+    }
+
+    {:ok, %{seq: metrical_seq, track: t}}
   end
 
   test "name", context do
@@ -39,79 +50,79 @@ defmodule SequenceTest do
   end
 
   test "metrical_time? with SMPTE format" do
-    # Create a sequence with SMPTE division (25 fps, 40 ticks per frame)
-    smpte_division = Sequence.create_smpte_division(25, 40)
-    division_int = :binary.decode_unsigned(smpte_division)
-    seq = %Sequence{division: division_int}
+    # Create a sequence with SMPTE time basis (25 fps, 40 ticks per frame)
+    seq = %Sequence{
+      time_basis: :smpte,
+      ticks_per_quarter_note: nil,
+      smpte_format: 25,
+      ticks_per_frame: 40,
+      division: 0xE728  # For compatibility - normally would be set via helper functions
+    }
     
     assert Sequence.metrical_time?(seq) == false
   end
 
   test "smpte_format? with SMPTE format" do
-    # Create a sequence with SMPTE division (25 fps, 40 ticks per frame)
-    smpte_division = Sequence.create_smpte_division(25, 40)
-    division_int = :binary.decode_unsigned(smpte_division)
-    seq = %Sequence{division: division_int}
+    # Create a sequence with SMPTE time basis (25 fps, 40 ticks per frame)
+    seq = %Sequence{
+      time_basis: :smpte,
+      ticks_per_quarter_note: nil,
+      smpte_format: 25,
+      ticks_per_frame: 40,
+      division: 0xE728  # For compatibility - normally would be set via helper functions
+    }
     
     assert Sequence.smpte_format?(seq) == true
   end
 
   test "ppqn with SMPTE format" do
-    # Create a sequence with SMPTE division (25 fps, 40 ticks per frame)
-    smpte_division = Sequence.create_smpte_division(25, 40)
-    division_int = :binary.decode_unsigned(smpte_division)
-    seq = %Sequence{division: division_int}
+    # Create a sequence with SMPTE time basis (25 fps, 40 ticks per frame)
+    seq = %Sequence{
+      time_basis: :smpte,
+      ticks_per_quarter_note: nil,
+      smpte_format: 25,
+      ticks_per_frame: 40,
+      division: 0xE728  # For compatibility - normally would be set via helper functions
+    }
     
     assert Sequence.ppqn(seq) == nil
   end
 
   test "smpte_frames_per_second" do
     # Test all valid SMPTE frames per second values
-    # Use our division creation function to ensure consistency
-    smpte_24 = Sequence.create_smpte_division(24, 4)  # 24 fps, 4 ticks/frame
-    smpte_25 = Sequence.create_smpte_division(25, 4)  # 25 fps, 4 ticks/frame
-    smpte_29 = Sequence.create_smpte_division(29, 4)  # 29.97 fps, 4 ticks/frame
-    smpte_30 = Sequence.create_smpte_division(30, 4)  # 30 fps, 4 ticks/frame
+    # Use the new structure directly
+    seq_24fps = %Sequence{time_basis: :smpte, smpte_format: 24, ticks_per_frame: 4}
+    seq_25fps = %Sequence{time_basis: :smpte, smpte_format: 25, ticks_per_frame: 4}
+    seq_29fps = %Sequence{time_basis: :smpte, smpte_format: 29, ticks_per_frame: 4}
+    seq_30fps = %Sequence{time_basis: :smpte, smpte_format: 30, ticks_per_frame: 4}
     
-    # Convert each binary to integer for use in struct
-    smpte_24_int = :binary.decode_unsigned(smpte_24)
-    smpte_25_int = :binary.decode_unsigned(smpte_25)
-    smpte_29_int = :binary.decode_unsigned(smpte_29)
-    smpte_30_int = :binary.decode_unsigned(smpte_30)
-    
-    assert Sequence.smpte_frames_per_second(%Sequence{division: smpte_24_int}) == 24
-    assert Sequence.smpte_frames_per_second(%Sequence{division: smpte_25_int}) == 25
-    assert Sequence.smpte_frames_per_second(%Sequence{division: smpte_29_int}) == 29
-    assert Sequence.smpte_frames_per_second(%Sequence{division: smpte_30_int}) == 30
+    assert Sequence.smpte_frames_per_second(seq_24fps) == 24
+    assert Sequence.smpte_frames_per_second(seq_25fps) == 25
+    assert Sequence.smpte_frames_per_second(seq_29fps) == 29
+    assert Sequence.smpte_frames_per_second(seq_30fps) == 30
     
     # Should return nil for metrical time format
-    assert Sequence.smpte_frames_per_second(%Sequence{division: 480}) == nil
+    metrical_seq = %Sequence{time_basis: :metrical_time, ticks_per_quarter_note: 480}
+    assert Sequence.smpte_frames_per_second(metrical_seq) == nil
   end
 
   test "smpte_ticks_per_frame" do
-    # Test various ticks per frame values
-    # Use our division creation function to ensure consistency
-    smpte_4 = Sequence.create_smpte_division(25, 4)     # 25 fps, 4 ticks/frame
-    smpte_8 = Sequence.create_smpte_division(25, 8)     # 25 fps, 8 ticks/frame
-    smpte_10 = Sequence.create_smpte_division(25, 10)   # 25 fps, 10 ticks/frame
-    smpte_80 = Sequence.create_smpte_division(25, 80)   # 25 fps, 80 ticks/frame
-    smpte_100 = Sequence.create_smpte_division(25, 100) # 25 fps, 100 ticks/frame
+    # Test various ticks per frame values with the new structure
+    seq_4tpf = %Sequence{time_basis: :smpte, smpte_format: 25, ticks_per_frame: 4}
+    seq_8tpf = %Sequence{time_basis: :smpte, smpte_format: 25, ticks_per_frame: 8}
+    seq_10tpf = %Sequence{time_basis: :smpte, smpte_format: 25, ticks_per_frame: 10}
+    seq_80tpf = %Sequence{time_basis: :smpte, smpte_format: 25, ticks_per_frame: 80}
+    seq_100tpf = %Sequence{time_basis: :smpte, smpte_format: 25, ticks_per_frame: 100}
     
-    # Convert each binary to integer for use in struct
-    smpte_4_int = :binary.decode_unsigned(smpte_4)
-    smpte_8_int = :binary.decode_unsigned(smpte_8)
-    smpte_10_int = :binary.decode_unsigned(smpte_10)
-    smpte_80_int = :binary.decode_unsigned(smpte_80)
-    smpte_100_int = :binary.decode_unsigned(smpte_100)
-    
-    assert Sequence.smpte_ticks_per_frame(%Sequence{division: smpte_4_int}) == 4
-    assert Sequence.smpte_ticks_per_frame(%Sequence{division: smpte_8_int}) == 8
-    assert Sequence.smpte_ticks_per_frame(%Sequence{division: smpte_10_int}) == 10
-    assert Sequence.smpte_ticks_per_frame(%Sequence{division: smpte_80_int}) == 80
-    assert Sequence.smpte_ticks_per_frame(%Sequence{division: smpte_100_int}) == 100
+    assert Sequence.smpte_ticks_per_frame(seq_4tpf) == 4
+    assert Sequence.smpte_ticks_per_frame(seq_8tpf) == 8
+    assert Sequence.smpte_ticks_per_frame(seq_10tpf) == 10
+    assert Sequence.smpte_ticks_per_frame(seq_80tpf) == 80
+    assert Sequence.smpte_ticks_per_frame(seq_100tpf) == 100
     
     # Should return nil for metrical time format
-    assert Sequence.smpte_ticks_per_frame(%Sequence{division: 480}) == nil
+    metrical_seq = %Sequence{time_basis: :metrical_time, ticks_per_quarter_note: 480}
+    assert Sequence.smpte_ticks_per_frame(metrical_seq) == nil
   end
 
   test "create_metrical_division" do
@@ -182,5 +193,102 @@ defmodule SequenceTest do
     seq = %Sequence{conductor_track: %Track{events: []}}
     # Should return the same sequence and print a warning
     assert Sequence.set_bpm(seq, 120) == seq
+  end
+  
+  test "with_metrical_time" do
+    # Start with a sequence that has SMPTE time basis
+    smpte_seq = %Sequence{
+      time_basis: :smpte,
+      ticks_per_quarter_note: nil,
+      smpte_format: 25,
+      ticks_per_frame: 40,
+      division: 0xE728  # For compatibility
+    }
+    
+    # Convert to metrical time
+    metrical_seq = Sequence.with_metrical_time(smpte_seq, 480)
+    
+    # Verify all properties were updated correctly
+    assert metrical_seq.time_basis == :metrical_time
+    assert metrical_seq.ticks_per_quarter_note == 480
+    assert metrical_seq.smpte_format == nil
+    assert metrical_seq.ticks_per_frame == nil
+    
+    # Verify the division field was also updated for backward compatibility
+    assert metrical_seq.division == 480
+  end
+  
+  test "with_smpte_time" do
+    # Start with a sequence that has metrical time basis
+    metrical_seq = %Sequence{
+      time_basis: :metrical_time,
+      ticks_per_quarter_note: 480,
+      smpte_format: nil,
+      ticks_per_frame: nil,
+      division: 480  # For compatibility
+    }
+    
+    # Convert to SMPTE time
+    smpte_seq = Sequence.with_smpte_time(metrical_seq, 25, 40)
+    
+    # Verify all properties were updated correctly
+    assert smpte_seq.time_basis == :smpte
+    assert smpte_seq.ticks_per_quarter_note == nil
+    assert smpte_seq.smpte_format == 25
+    assert smpte_seq.ticks_per_frame == 40
+    
+    # Verify the division field was also updated for backward compatibility
+    smpte_division = :binary.decode_unsigned(Sequence.create_smpte_division(25, 40))
+    assert smpte_seq.division == smpte_division
+  end
+  
+  test "parse_division with metrical time" do
+    # Test parsing a metrical time division value
+    division = 480
+    result = Sequence.parse_division(division)
+    
+    assert result.time_basis == :metrical_time
+    assert result.ticks_per_quarter_note == 480
+    assert result.smpte_format == nil
+    assert result.ticks_per_frame == nil
+  end
+  
+  test "parse_division with SMPTE time" do
+    # Test parsing SMPTE division values for all valid frame rates
+    # Create SMPTE divisions for each format
+    div_24fps = :binary.decode_unsigned(Sequence.create_smpte_division(24, 4))
+    div_25fps = :binary.decode_unsigned(Sequence.create_smpte_division(25, 40))
+    div_29fps = :binary.decode_unsigned(Sequence.create_smpte_division(29, 80))
+    div_30fps = :binary.decode_unsigned(Sequence.create_smpte_division(30, 100))
+    
+    # Parse each division
+    result_24 = Sequence.parse_division(div_24fps)
+    result_25 = Sequence.parse_division(div_25fps)
+    result_29 = Sequence.parse_division(div_29fps)
+    result_30 = Sequence.parse_division(div_30fps)
+    
+    # Verify 24 fps result
+    assert result_24.time_basis == :smpte
+    assert result_24.ticks_per_quarter_note == nil
+    assert result_24.smpte_format == 24
+    assert result_24.ticks_per_frame == 4
+    
+    # Verify 25 fps result
+    assert result_25.time_basis == :smpte
+    assert result_25.ticks_per_quarter_note == nil
+    assert result_25.smpte_format == 25
+    assert result_25.ticks_per_frame == 40
+    
+    # Verify 29.97 fps result
+    assert result_29.time_basis == :smpte
+    assert result_29.ticks_per_quarter_note == nil
+    assert result_29.smpte_format == 29
+    assert result_29.ticks_per_frame == 80
+    
+    # Verify 30 fps result
+    assert result_30.time_basis == :smpte
+    assert result_30.ticks_per_quarter_note == nil
+    assert result_30.smpte_format == 30
+    assert result_30.ticks_per_frame == 100
   end
 end

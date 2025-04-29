@@ -54,6 +54,9 @@ defmodule Midifile.Reader do
     tracks = read_tracks(f, num_tracks, pos + 10, [])
     File.close(f)
     
+    # Parse the division value to determine time basis and related values
+    time_basis_values = Sequence.parse_division(division)
+    
     case {format, tracks} do
       # Format 0: Single track containing all MIDI data
       {0, [single_track]} ->
@@ -67,19 +70,52 @@ defmodule Midifile.Reader do
         content_track = %Track{name: single_track.name, events: content_events}
         
         # Return a format 1 sequence
-        %Sequence{format: 1, division: division,
-                  conductor_track: conductor_track, tracks: [content_track]}
+        %Sequence{
+          format: 1, 
+          # Set division for backward compatibility
+          division: division,
+          # Set the new explicit time basis properties
+          time_basis: time_basis_values.time_basis,
+          ticks_per_quarter_note: time_basis_values.ticks_per_quarter_note,
+          smpte_format: time_basis_values.smpte_format,
+          ticks_per_frame: time_basis_values.ticks_per_frame,
+          # Set tracks
+          conductor_track: conductor_track, 
+          tracks: [content_track]
+        }
                   
       # Format 1: Multiple tracks with first track as conductor
       {1, [conductor_track | remaining_tracks]} ->
-        %Sequence{format: format, division: division,
-                  conductor_track: conductor_track, tracks: remaining_tracks}
+        %Sequence{
+          format: format, 
+          # Set division for backward compatibility
+          division: division,
+          # Set the new explicit time basis properties
+          time_basis: time_basis_values.time_basis,
+          ticks_per_quarter_note: time_basis_values.ticks_per_quarter_note,
+          smpte_format: time_basis_values.smpte_format,
+          ticks_per_frame: time_basis_values.ticks_per_frame,
+          # Set tracks
+          conductor_track: conductor_track, 
+          tracks: remaining_tracks
+        }
                   
       # Other cases (should not normally occur)
       {_, tracks} ->
         [conductor_track | remaining_tracks] = tracks
-        %Sequence{format: format, division: division,
-                  conductor_track: conductor_track, tracks: remaining_tracks}
+        %Sequence{
+          format: format, 
+          # Set division for backward compatibility
+          division: division,
+          # Set the new explicit time basis properties
+          time_basis: time_basis_values.time_basis,
+          ticks_per_quarter_note: time_basis_values.ticks_per_quarter_note,
+          smpte_format: time_basis_values.smpte_format,
+          ticks_per_frame: time_basis_values.ticks_per_frame,
+          # Set tracks
+          conductor_track: conductor_track, 
+          tracks: remaining_tracks
+        }
     end
   end
   

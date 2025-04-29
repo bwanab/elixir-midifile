@@ -1,7 +1,17 @@
 defmodule Midifile.Sequence do
   @default_bpm 120
 
-  defstruct format: 1, division: 480, conductor_track: nil, tracks: []
+  defstruct format: 1, 
+            # New explicit time basis structure
+            time_basis: :metrical_time,  # :metrical_time or :smpte
+            ticks_per_quarter_note: 480, # Used when time_basis is :metrical_time
+            smpte_format: nil,           # 24, 25, 29, or 30 - used when time_basis is :smpte
+            ticks_per_frame: nil,        # Used when time_basis is :smpte
+            # Legacy field - maintained for backward compatibility
+            division: 480, 
+            # Track structure
+            conductor_track: nil, 
+            tracks: []
 
   def name(%Midifile.Sequence{conductor_track: nil}), do: ""
   def name(%Midifile.Sequence{conductor_track: %Midifile.Track{events: []}}), do: ""
@@ -54,35 +64,23 @@ defmodule Midifile.Sequence do
 
   @doc """
   Returns true if the sequence uses a metrical time division (ticks per quarter note).
-  In this case, bit 15 of the division word is 0.
   """
-  def metrical_time?(seq) do
-    <<format_bit::size(1), _::size(15)>> = <<seq.division::size(16)>>
-    format_bit == 0
-  end
+  def metrical_time?(%Midifile.Sequence{time_basis: :metrical_time}), do: true
+  def metrical_time?(_), do: false
 
   @doc """
   Returns true if the sequence uses SMPTE time division format.
-  In this case, bit 15 of the division word is 1.
   """
-  def smpte_format?(seq) do
-    <<format_bit::size(1), _::size(15)>> = <<seq.division::size(16)>>
-    format_bit == 1
-  end
+  def smpte_format?(%Midifile.Sequence{time_basis: :smpte}), do: true
+  def smpte_format?(_), do: false
 
   @doc """
   Returns the pulses per quarter note (PPQN) value.
-  This is only valid if the sequence uses metrical time (bit 15 of division is 0).
+  This is only valid if the sequence uses metrical time.
   If the sequence uses SMPTE format, returns nil.
   """
-  def ppqn(seq) do
-    if metrical_time?(seq) do
-      <<0::size(1), ppqn::size(15)>> = <<seq.division::size(16)>>
-      ppqn
-    else
-      nil
-    end
-  end
+  def ppqn(%Midifile.Sequence{time_basis: :metrical_time, ticks_per_quarter_note: tpqn}), do: tpqn
+  def ppqn(_), do: nil
 
   @doc """
   Returns the SMPTE frames per second value, if the sequence uses SMPTE format.
@@ -90,23 +88,8 @@ defmodule Midifile.Sequence do
   or 30 frames per second.
   Returns nil if the sequence uses metrical time format.
   """
-  def smpte_frames_per_second(seq) do
-    if smpte_format?(seq) do
-      <<1::size(1), frames_bits::size(7), _::size(8)>> = <<seq.division::size(16)>>
-      
-      # Convert from two's complement negative value
-      # The frames value is stored as a negative number in two's complement form
-      case frames_bits do
-        0b1101000 -> 24  # -24 in 7-bit two's complement (0x68)
-        0b1100111 -> 25  # -25 in 7-bit two's complement (0x67)
-        0b1100011 -> 29  # -29 in 7-bit two's complement (0x63)
-        0b1100010 -> 30  # -30 in 7-bit two's complement (0x62)
-        _ -> nil         # Invalid value
-      end
-    else
-      nil
-    end
-  end
+  def smpte_frames_per_second(%Midifile.Sequence{time_basis: :smpte, smpte_format: format}), do: format
+  def smpte_frames_per_second(_), do: nil
 
   @doc """
   Returns the SMPTE ticks per frame value, if the sequence uses SMPTE format.
@@ -114,18 +97,54 @@ defmodule Midifile.Sequence do
   80 (bit resolution), or 100.
   Returns nil if the sequence uses metrical time format.
   """
-  def smpte_ticks_per_frame(seq) do
-    if smpte_format?(seq) do
-      <<_::size(8), ticks::size(8)>> = <<seq.division::size(16)>>
-      ticks
-    else
-      nil
-    end
-  end
+  def smpte_ticks_per_frame(%Midifile.Sequence{time_basis: :smpte, ticks_per_frame: ticks}), do: ticks
+  def smpte_ticks_per_frame(_), do: nil
 
+  @doc """
+  Creates a new sequence with metrical time basis (ticks per quarter note).
+  """
+  def with_metrical_time(sequence, ticks_per_quarter_note) when is_integer(ticks_per_quarter_note) and ticks_per_quarter_note in 1..32767 do
+    division = :binary.decode_unsigned(create_metrical_division(ticks_per_quarter_note))
+    
+    %Midifile.Sequence{
+      sequence |
+      time_basis: :metrical_time,
+      ticks_per_quarter_note: ticks_per_quarter_note,
+      smpte_format: nil,
+      ticks_per_frame: nil,
+      division: division
+    }
+  end
+  
+  @doc """
+  Creates a new sequence with SMPTE time basis.
+  
+  Valid frames_per_second values are: 24, 25, 29 (for 29.97 drop frame), and 30.
+  """
+  def with_smpte_time(sequence, frames_per_second, ticks_per_frame) 
+      when frames_per_second in [24, 25, 29, 30] and
+           is_integer(ticks_per_frame) and 
+           ticks_per_frame in 1..255 do
+    
+    division = :binary.decode_unsigned(create_smpte_division(frames_per_second, ticks_per_frame))
+    
+    %Midifile.Sequence{
+      sequence |
+      time_basis: :smpte,
+      ticks_per_quarter_note: nil,
+      smpte_format: frames_per_second,
+      ticks_per_frame: ticks_per_frame,
+      division: division
+    }
+  end
+  
+  # Legacy support functions that work with raw division values
+  
   @doc """
   Creates a standard metrical time division value from a pulses per quarter note (PPQN) value.
   This sets bit 15 to 0 and uses the lower 15 bits for the PPQN.
+  
+  This is a low-level function for compatibility. Prefer using with_metrical_time/2 instead.
   """
   def create_metrical_division(ppqn) when is_integer(ppqn) and ppqn in 1..32767 do
     <<0::size(1), ppqn::size(15)>>
@@ -137,6 +156,8 @@ defmodule Midifile.Sequence do
   and the lower 8 bits for ticks per frame.
   
   Valid frames_per_second values are: 24, 25, 29 (for 29.97 drop frame), and 30.
+  
+  This is a low-level function for compatibility. Prefer using with_smpte_time/3 instead.
   """
   def create_smpte_division(frames_per_second, ticks_per_frame) 
       when frames_per_second in [24, 25, 29, 30] and
@@ -152,5 +173,46 @@ defmodule Midifile.Sequence do
     end
     
     <<1::size(1), frames_bits::size(7), ticks_per_frame::size(8)>>
+  end
+  
+  @doc """
+  Parse a division value from a MIDI file and return appropriate time basis values.
+  
+  This function is meant to be used by the Reader module to initialize a new Sequence
+  with the correct time basis values based on the division value from a MIDI file.
+  
+  Returns a map with :time_basis, :ticks_per_quarter_note, :smpte_format, :ticks_per_frame.
+  """
+  def parse_division(division) when is_integer(division) do
+    <<format_bit::size(1), rest::size(15)>> = <<division::size(16)>>
+    
+    if format_bit == 0 do
+      # Metrical time
+      %{
+        time_basis: :metrical_time,
+        ticks_per_quarter_note: rest,
+        smpte_format: nil,
+        ticks_per_frame: nil
+      }
+    else
+      # SMPTE time
+      <<frames_bits::size(7), ticks::size(8)>> = <<rest::size(15)>>
+      
+      # Convert from two's complement negative value
+      frames_per_second = case frames_bits do
+        0b1101000 -> 24  # -24 in 7-bit two's complement
+        0b1100111 -> 25  # -25 in 7-bit two's complement
+        0b1100011 -> 29  # -29 in 7-bit two's complement (for 30 drop frame)
+        0b1100010 -> 30  # -30 in 7-bit two's complement
+        _ -> nil         # Invalid value
+      end
+      
+      %{
+        time_basis: :smpte,
+        ticks_per_quarter_note: nil,
+        smpte_format: frames_per_second,
+        ticks_per_frame: ticks
+      }
+    end
   end
 end
