@@ -1,14 +1,13 @@
 defmodule Midifile.Sequence do
   @default_bpm 120
+  @default_ppqn 480
 
   defstruct format: 1, 
-            # New explicit time basis structure
+            # Explicit time basis structure
             time_basis: :metrical_time,  # :metrical_time or :smpte
             ticks_per_quarter_note: 480, # Used when time_basis is :metrical_time
             smpte_format: nil,           # 24, 25, 29, or 30 - used when time_basis is :smpte
             ticks_per_frame: nil,        # Used when time_basis is :smpte
-            # Legacy field - maintained for backward compatibility
-            division: 480, 
             # Track structure
             conductor_track: nil, 
             tracks: []
@@ -104,15 +103,12 @@ defmodule Midifile.Sequence do
   Creates a new sequence with metrical time basis (ticks per quarter note).
   """
   def with_metrical_time(sequence, ticks_per_quarter_note) when is_integer(ticks_per_quarter_note) and ticks_per_quarter_note in 1..32767 do
-    division = :binary.decode_unsigned(create_metrical_division(ticks_per_quarter_note))
-    
     %Midifile.Sequence{
       sequence |
       time_basis: :metrical_time,
       ticks_per_quarter_note: ticks_per_quarter_note,
       smpte_format: nil,
-      ticks_per_frame: nil,
-      division: division
+      ticks_per_frame: nil
     }
   end
   
@@ -126,15 +122,12 @@ defmodule Midifile.Sequence do
            is_integer(ticks_per_frame) and 
            ticks_per_frame in 1..255 do
     
-    division = :binary.decode_unsigned(create_smpte_division(frames_per_second, ticks_per_frame))
-    
     %Midifile.Sequence{
       sequence |
       time_basis: :smpte,
       ticks_per_quarter_note: nil,
       smpte_format: frames_per_second,
-      ticks_per_frame: ticks_per_frame,
-      division: division
+      ticks_per_frame: ticks_per_frame
     }
   end
   
@@ -174,6 +167,32 @@ defmodule Midifile.Sequence do
     
     <<1::size(1), frames_bits::size(7), ticks_per_frame::size(8)>>
   end
+  
+  @doc """
+  Calculate the division value from a sequence's time basis fields.
+  
+  This replaces the old division field with a calculated property based on
+  the explicit time basis settings. This ensures there's only one source of
+  truth for time basis information.
+  
+  ## Returns
+    * For metrical time: the ticks_per_quarter_note value
+    * For SMPTE time: the encoded SMPTE division value
+    * Default of 480 if the time_basis is invalid or fields are missing
+  """
+  def division(%__MODULE__{time_basis: :metrical_time, ticks_per_quarter_note: tpqn}) 
+      when not is_nil(tpqn) do
+    tpqn
+  end
+  
+  def division(%__MODULE__{time_basis: :smpte, smpte_format: format, ticks_per_frame: tpf}) 
+      when not is_nil(format) and not is_nil(tpf) do
+    # Calculate division value from SMPTE format
+    division_binary = create_smpte_division(format, tpf)
+    :binary.decode_unsigned(division_binary)
+  end
+  
+  def division(_), do: @default_ppqn  # Default if missing or invalid time_basis
   
   @doc """
   Parse a division value from a MIDI file and return appropriate time basis values.

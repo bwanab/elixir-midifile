@@ -21,7 +21,6 @@ defmodule SequenceTest do
       ticks_per_quarter_note: 480,
       smpte_format: nil,
       ticks_per_frame: nil,
-      division: 480,  # For backwards compatibility
       conductor_track: ct, 
       tracks: [t, t, t]
     }
@@ -55,8 +54,7 @@ defmodule SequenceTest do
       time_basis: :smpte,
       ticks_per_quarter_note: nil,
       smpte_format: 25,
-      ticks_per_frame: 40,
-      division: 0xE728  # For compatibility - normally would be set via helper functions
+      ticks_per_frame: 40
     }
     
     assert Sequence.metrical_time?(seq) == false
@@ -68,8 +66,7 @@ defmodule SequenceTest do
       time_basis: :smpte,
       ticks_per_quarter_note: nil,
       smpte_format: 25,
-      ticks_per_frame: 40,
-      division: 0xE728  # For compatibility - normally would be set via helper functions
+      ticks_per_frame: 40
     }
     
     assert Sequence.smpte_format?(seq) == true
@@ -81,8 +78,7 @@ defmodule SequenceTest do
       time_basis: :smpte,
       ticks_per_quarter_note: nil,
       smpte_format: 25,
-      ticks_per_frame: 40,
-      division: 0xE728  # For compatibility - normally would be set via helper functions
+      ticks_per_frame: 40
     }
     
     assert Sequence.ppqn(seq) == nil
@@ -201,8 +197,7 @@ defmodule SequenceTest do
       time_basis: :smpte,
       ticks_per_quarter_note: nil,
       smpte_format: 25,
-      ticks_per_frame: 40,
-      division: 0xE728  # For compatibility
+      ticks_per_frame: 40
     }
     
     # Convert to metrical time
@@ -214,8 +209,8 @@ defmodule SequenceTest do
     assert metrical_seq.smpte_format == nil
     assert metrical_seq.ticks_per_frame == nil
     
-    # Verify the division field was also updated for backward compatibility
-    assert metrical_seq.division == 480
+    # Verify the division is calculated correctly
+    assert Sequence.division(metrical_seq) == 480
   end
   
   test "with_smpte_time" do
@@ -224,8 +219,7 @@ defmodule SequenceTest do
       time_basis: :metrical_time,
       ticks_per_quarter_note: 480,
       smpte_format: nil,
-      ticks_per_frame: nil,
-      division: 480  # For compatibility
+      ticks_per_frame: nil
     }
     
     # Convert to SMPTE time
@@ -237,9 +231,9 @@ defmodule SequenceTest do
     assert smpte_seq.smpte_format == 25
     assert smpte_seq.ticks_per_frame == 40
     
-    # Verify the division field was also updated for backward compatibility
+    # Verify the division is calculated correctly
     smpte_division = :binary.decode_unsigned(Sequence.create_smpte_division(25, 40))
-    assert smpte_seq.division == smpte_division
+    assert Sequence.division(smpte_seq) == smpte_division
   end
   
   test "parse_division with metrical time" do
@@ -290,5 +284,32 @@ defmodule SequenceTest do
     assert result_30.ticks_per_quarter_note == nil
     assert result_30.smpte_format == 30
     assert result_30.ticks_per_frame == 100
+  end
+  
+  test "division function with metrical time" do
+    # Test division calculation for metrical time
+    seq = %Sequence{
+      time_basis: :metrical_time,
+      ticks_per_quarter_note: 480,
+      smpte_format: nil,
+      ticks_per_frame: nil
+    }
+    
+    assert Sequence.division(seq) == 480
+  end
+  
+  test "division function with SMPTE time" do
+    # Test division calculation for SMPTE time
+    seq = %Sequence{
+      time_basis: :smpte,
+      ticks_per_quarter_note: nil,
+      smpte_format: 25,
+      ticks_per_frame: 40
+    }
+    
+    # Calculate expected division
+    expected = :binary.decode_unsigned(Sequence.create_smpte_division(25, 40))
+    
+    assert Sequence.division(seq) == expected
   end
 end

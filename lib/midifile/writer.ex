@@ -32,7 +32,10 @@ defmodule Midifile.Writer do
   MIDI file writer.
   """
 
-  def write(%Sequence{format: format, division: division, conductor_track: ct, tracks: tracks}, path) do
+  def write(%Sequence{format: format, conductor_track: ct, tracks: tracks} = sequence, path) do
+    # Calculate division from time basis fields
+    division = Sequence.division(sequence)
+    
     l = [header_io_list(format, division, length(tracks) + 1) |
   	     Enum.map([ct | tracks], &track_io_list/1)]
     :ok = :file.write_file(path, IO.iodata_to_binary(l))

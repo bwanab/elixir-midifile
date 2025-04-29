@@ -72,9 +72,7 @@ defmodule Midifile.Reader do
         # Return a format 1 sequence
         %Sequence{
           format: 1, 
-          # Set division for backward compatibility
-          division: division,
-          # Set the new explicit time basis properties
+          # Set the time basis properties
           time_basis: time_basis_values.time_basis,
           ticks_per_quarter_note: time_basis_values.ticks_per_quarter_note,
           smpte_format: time_basis_values.smpte_format,
@@ -88,9 +86,7 @@ defmodule Midifile.Reader do
       {1, [conductor_track | remaining_tracks]} ->
         %Sequence{
           format: format, 
-          # Set division for backward compatibility
-          division: division,
-          # Set the new explicit time basis properties
+          # Set the time basis properties
           time_basis: time_basis_values.time_basis,
           ticks_per_quarter_note: time_basis_values.ticks_per_quarter_note,
           smpte_format: time_basis_values.smpte_format,
@@ -105,9 +101,7 @@ defmodule Midifile.Reader do
         [conductor_track | remaining_tracks] = tracks
         %Sequence{
           format: format, 
-          # Set division for backward compatibility
-          division: division,
-          # Set the new explicit time basis properties
+          # Set the time basis properties
           time_basis: time_basis_values.time_basis,
           ticks_per_quarter_note: time_basis_values.ticks_per_quarter_note,
           smpte_format: time_basis_values.smpte_format,
