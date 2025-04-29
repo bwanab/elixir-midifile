@@ -2,6 +2,77 @@ defmodule Midifile.Util do
   @moduledoc """
   Utility functions for transforming MIDI files.
   """
+  
+  @doc """
+  Scans a directory for MIDI files (.mid), reads each file, and reports its status.
+  
+  For each MIDI file found:
+  - If reading succeeds, outputs filename and time_basis value
+  - If reading fails, outputs filename and error cause (if known) or "read error"
+  
+  ## Parameters
+    * `directory_path` - Path to the directory to scan for MIDI files
+    
+  ## Returns
+    * :ok
+  """
+  def scan_midi_directory(directory_path) do
+    # Ensure directory path exists
+    if not File.dir?(directory_path) do
+      IO.puts("Error: Directory '#{directory_path}' does not exist")
+      :error
+    else
+      # Find all .mid files in the directory
+      midi_files = 
+        File.ls!(directory_path)
+        |> Enum.filter(fn file -> String.ends_with?(file, ".mid") end)
+        |> Enum.map(fn file -> Path.join(directory_path, file) end)
+        
+      if Enum.empty?(midi_files) do
+        IO.puts("No MIDI files found in '#{directory_path}'")
+      else
+        IO.puts("Found #{length(midi_files)} MIDI file(s) in '#{directory_path}'")
+        IO.puts("------------------------------------------------------")
+        
+        # Process each MIDI file
+        Enum.each(midi_files, fn file_path ->
+          filename = Path.basename(file_path)
+          
+          try do
+            # Attempt to read the MIDI file
+            sequence = Midifile.read(file_path)
+            
+            # Format time_basis information
+            time_basis_info = case sequence.time_basis do
+              :metrical_time -> 
+                "metrical_time (#{sequence.ticks_per_quarter_note} ticks per quarter note)"
+              :smpte -> 
+                "smpte (#{sequence.smpte_format} frames per second, #{sequence.ticks_per_frame} ticks per frame)"
+              other -> 
+                "unknown (#{inspect(other)})"
+            end
+            
+            IO.puts("✓ #{filename}: #{time_basis_info}")
+          rescue
+            e in _ -> 
+              # Handle read errors
+              error_message = case e do
+                %File.Error{reason: reason} -> 
+                  "file error: #{inspect(reason)}"
+                %MatchError{} -> 
+                  "format error: not a valid MIDI file or unsupported format"
+                _ -> 
+                  "read error: #{inspect(e)}"
+              end
+              
+              IO.puts("✗ #{filename}: #{error_message}")
+          end
+        end)
+      end
+      
+      :ok
+    end
+  end
 
   @doc """
   Identifies instruments used in a MIDI file based on a sound mapping.
