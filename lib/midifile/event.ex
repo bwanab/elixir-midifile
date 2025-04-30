@@ -1,9 +1,27 @@
 defmodule Midifile.Event do
+  alias Note
+
+  @type event_type :: :note | :on | :off | :pitch_bend | :controller | :tempo | :time_signature | :track_end | :seq_name
+  @type t :: %__MODULE__{
+    symbol: event_type(),
+    delta_time: integer(),
+    bytes: list(integer())
+  }
   import Bitwise
 
   defstruct symbol: :off,
     delta_time: 0,
     bytes: []                   # data bytes, including status byte
+
+  # given a Note and a ticks_per_quarter_note (tpqn) return an :on :off pair of Events
+  @spec new(event_type(), Note.t(), integer()) :: [t()]
+  def new(:note, note, tpqn) do
+    midi_note = Note.note_to_midi(note)
+    [
+      %Midifile.Event{symbol: :on, delta_time: 0, bytes: [144, midi_note.note_number, midi_note.velocity]},
+      %Midifile.Event{symbol: :off, delta_time: tpqn * midi_note.duration, bytes: [128, midi_note.note_number, 0]}
+    ]
+  end
 
   def status(%Midifile.Event{bytes: [st|_]}) when st < 0xf0, do: band(st, 0xf0)
   def status(%Midifile.Event{bytes: [st|_]}), do: st

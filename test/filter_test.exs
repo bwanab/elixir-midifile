@@ -92,7 +92,11 @@ defmodule Midifile.FilterTest do
     # Create a test sequence with multiple notes
     sequence = %Midifile.Sequence{
       format: 1,
-      division: 480,
+      time_basis: :metrical_time,  # :metrical_time or :smpte
+      ticks_per_quarter_note: 480, # Used when time_basis is :metrical_time
+      smpte_format: nil,           # 24, 25, 29, or 30 - used when time_basis is :smpte
+      ticks_per_frame: nil,        # Used when time_basis is :smpte
+
       tracks: [
         %Midifile.Track{
           events: [
@@ -126,7 +130,7 @@ defmodule Midifile.FilterTest do
         # Remove the note
         :remove
       )
-    
+
     # Get the processed events
     processed_events = List.first(processed_sequence.tracks).events
 
@@ -172,7 +176,12 @@ defmodule Midifile.FilterTest do
     # Create a test sequence with multiple notes
     sequence = %Midifile.Sequence{
       format: 1,
-      division: 480,
+
+      time_basis: :metrical_time,  # :metrical_time or :smpte
+      ticks_per_quarter_note: 480, # Used when time_basis is :metrical_time
+      smpte_format: nil,           # 24, 25, 29, or 30 - used when time_basis is :smpte
+      ticks_per_frame: nil,        # Used when time_basis is :smpte
+
       tracks: [
         %Midifile.Track{
           events: [
@@ -199,7 +208,7 @@ defmodule Midifile.FilterTest do
         # Shift up one octave
         {:pitch, 12}
       )
-      
+
     # Get the processed events
     processed_events = List.first(processed_sequence.tracks).events
 
@@ -236,7 +245,10 @@ defmodule Midifile.FilterTest do
     # Create a test sequence with a note at the edge of MIDI range
     sequence = %Midifile.Sequence{
       format: 1,
-      division: 480,
+      time_basis: :metrical_time,  # :metrical_time or :smpte
+      ticks_per_quarter_note: 480, # Used when time_basis is :metrical_time
+      smpte_format: nil,           # 24, 25, 29, or 30 - used when time_basis is :smpte
+      ticks_per_frame: nil,        # Used when time_basis is :smpte
       tracks: [
         %Midifile.Track{
           events: [
@@ -263,7 +275,7 @@ defmodule Midifile.FilterTest do
         # Shift up by 20 semitones (beyond MIDI range)
         {:pitch, 20}
       )
-      
+
     high_processed_events = List.first(high_processed_sequence.tracks).events
 
     # Process low notes - shift down by 20 semitones (should clamp to 0)
@@ -276,7 +288,7 @@ defmodule Midifile.FilterTest do
         # Shift down by 20 semitones (below MIDI range)
         {:pitch, -20}
       )
-      
+
     low_processed_events = List.first(low_processed_sequence.tracks).events
 
     # Verify high note is clamped to 127
@@ -306,7 +318,12 @@ defmodule Midifile.FilterTest do
     # Create a test sequence with multiple notes
     sequence = %Midifile.Sequence{
       format: 1,
-      division: 480,
+
+      time_basis: :metrical_time,  # :metrical_time or :smpte
+      ticks_per_quarter_note: 480, # Used when time_basis is :metrical_time
+      smpte_format: nil,           # 24, 25, 29, or 30 - used when time_basis is :smpte
+      ticks_per_frame: nil,        # Used when time_basis is :smpte
+
       tracks: [
         %Midifile.Track{
           events: [
@@ -333,7 +350,7 @@ defmodule Midifile.FilterTest do
         # Change velocity to 64
         {:velocity, 64}
       )
-      
+
     # Get the processed events
     processed_events = List.first(processed_sequence.tracks).events
 
@@ -360,7 +377,11 @@ defmodule Midifile.FilterTest do
     # Create a test sequence using note_on with zero velocity as note_off
     sequence = %Midifile.Sequence{
       format: 1,
-      division: 480,
+      time_basis: :metrical_time,  # :metrical_time or :smpte
+      ticks_per_quarter_note: 480, # Used when time_basis is :metrical_time
+      smpte_format: nil,           # 24, 25, 29, or 30 - used when time_basis is :smpte
+      ticks_per_frame: nil,        # Used when time_basis is :smpte
+
       tracks: [
         %Midifile.Track{
           events: [
@@ -387,7 +408,7 @@ defmodule Midifile.FilterTest do
         # Remove the note
         :remove
       )
-      
+
     # Get the processed events
     processed_events = List.first(processed_sequence.tracks).events
 
@@ -409,7 +430,11 @@ defmodule Midifile.FilterTest do
     sequence = %Midifile.Sequence{
       format: 1,
       # Standard MIDI ticks per quarter note
-      division: 480,
+      time_basis: :metrical_time,  # :metrical_time or :smpte
+      ticks_per_quarter_note: 480, # Used when time_basis is :metrical_time
+      smpte_format: nil,           # 24, 25, 29, or 30 - used when time_basis is :smpte
+      ticks_per_frame: nil,        # Used when time_basis is :smpte
+
       tracks: [
         %Midifile.Track{
           events: [
