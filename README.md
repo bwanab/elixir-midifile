@@ -73,8 +73,16 @@ filtered_sequence = Midifile.Filter.remove_events(
 processed_sequence = Midifile.Filter.process_notes(
   sequence,
   0,
-  fn note -> note > 60 end,  # Only process notes above middle C
+  fn note -> note.note == {:c, 4} end,  # Only process C4 notes
   {:pitch, 12}  # Shift up one octave
+)
+
+# Filter out short notes (less than 0.25 duration)
+filtered_sequence = Midifile.Filter.process_notes(
+  sequence,
+  0,
+  fn note -> note.duration < 0.25 end,  # Match notes with short duration
+  :remove  # Remove these notes
 )
 ```
 
