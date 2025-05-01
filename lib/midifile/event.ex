@@ -15,13 +15,22 @@ defmodule Midifile.Event do
 
   # given a Note and a ticks_per_quarter_note (tpqn) return an :on :off pair of Events
   @spec new(event_type(), Note.t(), integer()) :: [t()]
-  def new(:note, note, tpqn) do
+  def new(note_type, note, tpqn \\ 960)
+  def new(:note, note, tpqn) when note.note != {:rest, 0} do
     midi_note = Note.note_to_midi(note)
     [
       %Midifile.Event{symbol: :on, delta_time: 0, bytes: [144, midi_note.note_number, midi_note.velocity]},
-      %Midifile.Event{symbol: :off, delta_time: tpqn * midi_note.duration, bytes: [128, midi_note.note_number, 0]}
+      %Midifile.Event{symbol: :off, delta_time: tpqn * round(midi_note.duration), bytes: [128, midi_note.note_number, 0]}
     ]
   end
+
+    # given a Note and a ticks_per_quarter_note (tpqn) return an :on :off pair of Events
+    def new(:note, note, tpqn) when note.note == {:rest, 0} do
+      midi_note = Note.note_to_midi(note)
+      [
+        %Midifile.Event{symbol: :off, delta_time: tpqn * round(midi_note.duration), bytes: [128, midi_note.note_number, 0]}
+      ]
+    end
 
   def status(%Midifile.Event{bytes: [st|_]}) when st < 0xf0, do: band(st, 0xf0)
   def status(%Midifile.Event{bytes: [st|_]}), do: st
