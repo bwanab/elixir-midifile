@@ -20,7 +20,7 @@ defmodule Midifile.Event do
     midi_note = Note.note_to_midi(note)
     [
       %Midifile.Event{symbol: :on, delta_time: 0, bytes: [144, midi_note.note_number, midi_note.velocity]},
-      %Midifile.Event{symbol: :off, delta_time: tpqn * round(midi_note.duration), bytes: [128, midi_note.note_number, 0]}
+      %Midifile.Event{symbol: :off, delta_time: round(tpqn * midi_note.duration), bytes: [128, midi_note.note_number, 0]}
     ]
   end
 
@@ -28,7 +28,7 @@ defmodule Midifile.Event do
     def new(:note, note, tpqn) when note.note == {:rest, 0} do
       midi_note = Note.note_to_midi(note)
       [
-        %Midifile.Event{symbol: :off, delta_time: tpqn * round(midi_note.duration), bytes: [128, midi_note.note_number, 0]}
+        %Midifile.Event{symbol: :off, delta_time: round(tpqn * midi_note.duration), bytes: [128, midi_note.note_number, 0]}
       ]
     end
 
