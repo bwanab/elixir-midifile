@@ -12,7 +12,7 @@ defmodule Midifile.Track do
   @spec new(String.t(), MusicPrims.note_sequence(), integer()) :: t()
   def new(name, notes, tpqn \\ 960) do
     e1 = [%Midifile.Event{symbol: :seq_name, delta_time: 0, bytes: name}]
-    events = Enum.map(notes, &(Midifile.Event.new(:note, &1, tpqn)))
+    events = Enum.map(notes, &(Midifile.Event.new(Sonority.get_type(&1), &1, tpqn)))
     e_last = [%Midifile.Event{symbol: :track_end, delta_time: 0, bytes: []}]
 
     %Midifile.Track{
