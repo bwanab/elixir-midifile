@@ -21,15 +21,35 @@ defmodule Examples.MidiFromScratch do
 
   # this is an example of building a chord sequence mixed with a rest and a two note melody line.
   # don't expect it do sound good :)
+  # BTW: Dialyzer complains about this function, but it compiles and works correctly.
+  @spec midi_file_mixed_chords_notes_rests() :: :ok
   def midi_file_mixed_chords_notes_rests() do
-    sonorities = [
-      Chord.new({{:C, 4}, :major}, 1),
-      Chord.new({{:D, 4}, :minor}, 1),
+    write_midi_file(create_sonorities(), "with chords")
+  end
+
+  # for reasons that I can't fathom, dialyzer thinks this is the correct spec of this function instead
+  # of the one that is on it.
+  #
+  # @spec create_sonorities() :: [
+  #         %{
+  #           :__struct__ => Chord | Note | Rest,
+  #           :duration => any(),
+  #           optional(:chord) => {{any(), any()}, atom()},
+  #           optional(:note) => any(),
+  #           optional(:notes) => [Note],
+  #           optional(:velocity) => any()
+  #         },
+  #         ...
+  #       ]
+  @spec create_sonorities() :: [Sonority.t()]
+  def create_sonorities() do
+    [
+      Chord.new([Note.new({:A, 4}, duration: 1)], 1.0),
+      Chord.new({{:D, 4}, :minor}, 1.0),
       Rest.new(1),
       Note.new({:A, 4}, duration: 1),
       Note.new({:B, 4}, duration: 1)
     ]
-    write_midi_file(sonorities, "with chords")
   end
 
 
@@ -39,27 +59,31 @@ defmodule Examples.MidiFromScratch do
   @spec midi_file_from_chord_progression() :: :ok
   def midi_file_from_chord_progression() do
     chords = Enum.map(ChordPrims.random_progression(10, 1), &(ChordPrims.chord_sym_to_chord(&1, {{:C, 4}, :major})))
-      |> Enum.map(&(Chord.new(&1, 4)))
+      |> Enum.map(&(Chord.new(&1, 4.0)))
     write_midi_file(chords, "random_progression")
   end
+  @spec write_midi_file([Sonority.t()], binary()) :: :ok
   def write_midi_file(notes, name) do
     track = Track.new(name, notes, 960)
     sfs = Sequence.new(name, 110, [track], 960)
     Writer.write(sfs, "test/#{name}.mid")
   end
 
+  @spec add_rest_at_keeping_total_duration([Sonority.t()], integer(), number()) :: {[Sonority.t()], float()}
   def add_rest_at_keeping_total_duration(ms, pos, duration) do
     note = Enum.at(ms, pos)
 
     {ms, _td} = change_dur_at(ms, pos, note.duration - duration)
     add_rest_at(ms, pos + 1, duration)
   end
+  @spec add_rest_at([Sonority.t()], integer(), any()) :: {Sonority.t(), float()}
   def add_rest_at(ms, pos, duration) do
     ms = List.insert_at(ms, pos, Note.rest(duration))
     total_dur = Enum.reduce(ms, 0,  &(&1.duration + &2))
     {ms, total_dur}
   end
 
+  @spec change_dur_at([Sonority.t()], integer(), any()) :: {[Sonority.t()], float()}
   def change_dur_at(ms, pos, duration) do
     note = Enum.at(ms, pos)
     ms = List.replace_at(ms, pos, Note.new(note.note, duration: duration, velocity: note.velocity))
