@@ -44,8 +44,10 @@ defmodule Examples.MidiFromScratch do
   @spec create_sonorities() :: [Sonority.t()]
   def create_sonorities() do
     [
-      Chord.new([Note.new({:A, 4}, duration: 1)], 1.0),
-      Chord.new({{:D, 4}, :minor}, 1.0),
+      # A major chord using enhanced API
+      Chord.from_root_and_quality(:A, :major, 4, 1.0),
+      # D minor chord using enhanced API
+      Chord.from_root_and_quality(:D, :minor, 4, 1.0),
       Rest.new(1),
       Note.new({:A, 4}, duration: 1),
       Note.new({:B, 4}, duration: 1)
@@ -58,8 +60,26 @@ defmodule Examples.MidiFromScratch do
   # appropriate string/organ/brass like instrument and it should sound pleasing albeit possibly incipid.
   @spec midi_file_from_chord_progression() :: :ok
   def midi_file_from_chord_progression() do
-    chords = Enum.map(ChordPrims.random_progression(10, 1), &(ChordPrims.chord_sym_to_chord(&1, {{:C, 4}, :major})))
-      |> Enum.map(&(Chord.new(&1, 4.0)))
+    # Get chord symbols (Roman numerals) from ChordPrims
+    roman_numerals = ChordPrims.random_progression(10, 1)
+    
+    # TODO: Enhance the Chord API to support direct creation from Roman numerals
+    # This would allow a cleaner syntax like:
+    #   Chord.from_roman_numeral(:I, :C, 4, 4.0)  # I chord in C major, octave 4, duration 4.0
+    
+    # First, convert the roman numerals to chord symbols (relative to C major)
+    # Then convert those chord symbols to enhanced chord objects
+    chords = Enum.map(roman_numerals, fn roman_numeral ->
+      # Convert roman numeral to chord symbol
+      chord_sym = ChordPrims.chord_sym_to_chord(roman_numeral, {{:C, 4}, :major})
+      
+      # Extract root and quality from the chord symbol
+      {{root, octave}, quality} = chord_sym
+      
+      # Create chord using enhanced API
+      Chord.from_root_and_quality(root, quality, octave, 4.0)
+    end)
+    
     write_midi_file(chords, "random_progression")
   end
   @spec write_midi_file([Sonority.t()], binary()) :: :ok

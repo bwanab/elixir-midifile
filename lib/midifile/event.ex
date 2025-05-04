@@ -59,6 +59,19 @@ defmodule Midifile.Event do
     # events at the start and all the :off events at the end.
     Enum.map(raw, &(Enum.at(&1, 0))) ++ Enum.map(raw, &(Enum.at(&1, 1)))
   end
+  
+  @spec new(event_type(), Chord.t(), integer()) :: [t()]
+  def new(:chord, chord, tpqn) do
+    # For the enhanced chord API, get the notes using to_notes()
+    notes = Chord.to_notes(chord)
+    [first | others] = notes
+    first_event = first_chord_note(first, chord.duration, tpqn)
+    other_events = Enum.map(others, &(other_chord_notes(&1)))
+    raw = [first_event | other_events]
+    # raw is now a list of :on :off pairs, we want to gather all the :on
+    # events at the start and all the :off events at the end.
+    Enum.map(raw, &(Enum.at(&1, 0))) ++ Enum.map(raw, &(Enum.at(&1, 1)))
+  end
 
 
   def first_chord_note(%Note{note: n, velocity: v}, duration, tpqn) do

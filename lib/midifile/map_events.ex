@@ -280,8 +280,8 @@ defmodule Midifile.MapEvents do
               notes = Enum.map(active_notes, fn note ->
                 Note.midi_to_note(note.note, duration, note.velocity)
               end)
-              # Create chord with the notes
-              Chord.new(notes, duration)
+              # Detect chord structure and create using enhanced API
+              create_enhanced_chord(notes, duration)
           end
 
           # Only add sonority if it has duration
@@ -312,5 +312,115 @@ defmodule Midifile.MapEvents do
       end)
 
     Enum.reverse(events_with_times)
+  end
+  
+  @doc false
+  # Creates a chord using the enhanced Chord API
+  # Attempts to detect the chord structure (root, quality) from the given notes
+  defp create_enhanced_chord(notes, duration) do
+    # Fallback to old API if detection fails
+    fallback_fn = fn -> Chord.new(notes, duration) end
+    
+    try do
+      {root, quality, octave} = detect_chord_from_notes(notes)
+      
+      # Create the basic chord
+      basic_chord = Chord.from_root_and_quality(root, quality, octave, duration)
+      
+      # Check if any notes aren't part of the basic chord
+      # If found, add them as additions
+      chord_notes = basic_chord 
+                    |> Chord.to_notes()
+                    |> Enum.map(fn n -> elem(n.note, 0) end) 
+                    |> MapSet.new()
+                    
+      note_pitches = notes 
+                     |> Enum.map(fn n -> elem(n.note, 0) end) 
+                     |> MapSet.new()
+      
+      additions = MapSet.difference(note_pitches, chord_notes)
+      
+      # If there are additions, add them to the chord
+      if MapSet.size(additions) > 0 do
+        addition_notes = Enum.filter(notes, fn n -> 
+          MapSet.member?(additions, elem(n.note, 0))
+        end)
+        
+        Chord.with_additions(basic_chord, addition_notes)
+      else
+        basic_chord
+      end
+    rescue
+      _ -> fallback_fn.()
+    end
+  end
+  
+  @doc false
+  # Detects the root, quality and octave of a chord from a list of notes
+  defp detect_chord_from_notes(notes) do
+    # Common chord structures with their root positions
+    chord_structures = [
+      # Major triads
+      {0, :major, MapSet.new([0, 4, 7])},
+      # Minor triads
+      {0, :minor, MapSet.new([0, 3, 7])},
+      # Dominant seventh
+      {0, :dominant_seventh, MapSet.new([0, 4, 7, 10])},
+      # Major seventh
+      {0, :major_seventh, MapSet.new([0, 4, 7, 11])},
+      # Minor seventh
+      {0, :minor_seventh, MapSet.new([0, 3, 7, 10])},
+      # Diminished
+      {0, :diminished, MapSet.new([0, 3, 6])},
+      # Augmented
+      {0, :augmented, MapSet.new([0, 4, 8])},
+      # Sus4
+      {0, :sus4, MapSet.new([0, 5, 7])},
+      # Sus2
+      {0, :sus2, MapSet.new([0, 2, 7])}
+    ]
+    
+    # Convert notes to MIDI note numbers
+    midi_notes = Enum.map(notes, fn note -> 
+      Note.note_to_midi(note)
+    end)
+    
+    # Find minimum MIDI note to use as reference
+    min_midi = Enum.min(midi_notes)
+    
+    # Calculate semitone distances from lowest note
+    semitones = Enum.map(midi_notes, fn midi -> 
+      rem(midi - min_midi, 12)
+    end) |> MapSet.new()
+    
+    # Score each possible chord structure
+    scored_matches = Enum.map(chord_structures, fn {root_offset, quality, intervals} ->
+      # How many notes in the chord match this structure
+      matching_notes = MapSet.intersection(semitones, intervals)
+      match_score = MapSet.size(matching_notes)
+      
+      # Prefer structures where most/all notes are accounted for
+      coverage = match_score / MapSet.size(semitones)
+      
+      # Prefer structures that have the root note
+      has_root = MapSet.member?(semitones, root_offset)
+      root_score = if has_root, do: 1, else: 0
+      
+      # Calculate total score - higher is better
+      total_score = match_score + coverage + root_score
+      
+      # Determine the root note (based on the structure's root offset from lowest note)
+      root_midi = min_midi + root_offset
+      
+      # Get the note and octave from the MIDI number
+      note = Note.midi_to_note(root_midi, 1.0, 64) # Default velocity of 64
+      {root_name, root_octave} = note.note
+      
+      {total_score, {root_name, quality, root_octave}}
+    end)
+    
+    # Select the highest scoring match
+    {_score, best_match} = Enum.max_by(scored_matches, fn {score, _} -> score end)
+    best_match
   end
 end
