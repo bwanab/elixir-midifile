@@ -10,8 +10,15 @@ Midifile is an Elixir library for reading, writing, and manipulating standard MI
 - Process notes with pitch shifting
 - Map drum notes between different standards (via CSV mapping files)
 - Preserve timing information when filtering events
+- Convert MIDI tracks to musical sonorities (notes, chords, rests)
+- Create MIDI tracks from musical sonorities
+- Support for both metrical time and SMPTE time formats
 
 ## Installation
+
+Note that in the current incarnation in order to use this functionality, you'll need 
+to clone into an adjacent folder the repository https://github.com/bwanab/music_prims as
+it is referenced by mix.exs and is used throughout.
 
 Add `midifile` to your list of dependencies in `mix.exs`:
 
@@ -49,9 +56,64 @@ A sequence contains a list of tracks and global information like the sequence's 
 
 The first track in a sequence is special; it holds meta-events like tempo and sequence name. It is stored as a sequence's `conductor_track`.
 
+You can create a new sequence with specific settings:
+
+```elixir
+# Create a new sequence with custom settings
+sequence = Midifile.Sequence.new(
+  "My Sequence",  # Name
+  120,            # BPM
+  tracks,         # List of tracks
+  960             # Ticks per quarter note (ppqn)
+)
+
+# Get or set sequence properties
+name = Midifile.Sequence.name(sequence)
+bpm = Midifile.Sequence.bpm(sequence)
+sequence = Midifile.Sequence.set_bpm(sequence, 140)
+
+# Get time division information
+ppqn = Midifile.Sequence.ppqn(sequence)  # For metrical time sequences
+```
+
+Midifile now supports both metrical time (ticks per quarter note) and SMPTE time formats:
+
+```elixir
+# Create a sequence with metrical time (most common)
+metrical_sequence = Midifile.Sequence.with_metrical_time(sequence, 960)
+
+# Create a sequence with SMPTE time format (for sync with video/audio)
+smpte_sequence = Midifile.Sequence.with_smpte_time(sequence, 30, 80)  # 30 fps, 80 ticks per frame
+
+# Check time format
+is_metrical = Midifile.Sequence.metrical_time?(sequence)
+is_smpte = Midifile.Sequence.smpte_format?(sequence)
+
+# Get SMPTE-specific information
+fps = Midifile.Sequence.smpte_frames_per_second(smpte_sequence)
+tpf = Midifile.Sequence.smpte_ticks_per_frame(smpte_sequence)
+```
+
 ### Midifile.Track
 
 A track contains an array of events. When you modify the events array, make sure to call `recalc_times/1` so each event gets its `time_from_start` recalculated.
+
+You can create a track directly from sonorities:
+
+```elixir
+# Create a track from musical sonorities (notes, chords, rests)
+track = Midifile.Track.new(
+  "Piano Track",       # Track name
+  sonorities,          # List of Note, Chord, and Rest objects
+  960                  # Ticks per quarter note
+)
+
+# Get track properties
+instrument = Midifile.Track.instrument(track)
+
+# Quantize the track's events to a specific grid
+quantized_track = Midifile.Track.quantize(track, 240)  # Quantize to 16th notes (at 960 ppqn)
+```
 
 ### Midifile.Event
 
@@ -101,6 +163,38 @@ Midifile.Util.map_drums(
 
 The CSV mapping file should have a header row and 3 columns: Item, From, To.
 
+### Midifile.MapEvents
+
+The MapEvents module converts MIDI tracks to musical sonorities (Note, Chord, Rest):
+
+```elixir
+# Convert a track to a sequence of sonorities
+sonorities = Midifile.MapEvents.track_to_sonorities(track, %{
+  chord_tolerance: 10,  # Group notes within 10 ticks as chords
+  ticks_per_quarter_note: sequence.ticks_per_quarter_note
+})
+
+# The returned sonorities can be notes, chords, or rests
+Enum.each(sonorities, fn sonority ->
+  case Sonority.type(sonority) do
+    :note -> IO.puts("Note: #{inspect(sonority.note)}, duration: #{Sonority.duration(sonority)}")
+    :chord -> IO.puts("Chord: #{length(sonority.notes)} notes, duration: #{Sonority.duration(sonority)}")
+    :rest -> IO.puts("Rest: duration: #{Sonority.duration(sonority)}")
+  end
+end)
+```
+
+### Midifile.Defaults
+
+The Defaults module provides standard MIDI settings:
+
+```elixir
+# Default values
+bpm = Midifile.Defaults.default_bpm()  # 120 BPM
+ppqn = Midifile.Defaults.default_ppqn()  # 960 pulses per quarter note
+time_sig = Midifile.Defaults.default_time_signature()  # [4, 4] (4/4 time)
+```
+
 ## How To Use
 
 ### Reading a MIDI File
@@ -135,6 +229,64 @@ processed_sequence = Midifile.Filter.process_notes(
 
 # Write the modified sequence to a new file
 Midifile.write(processed_sequence, "output.mid")
+```
+
+### Converting MIDI to Sonorities and Back
+
+This example shows how to convert MIDI data to musical sonorities and then back to MIDI:
+
+```elixir
+# Read a MIDI file
+sequence = Midifile.read("input.mid")
+track = Enum.at(sequence.tracks, 0)
+
+# Convert track to sonorities
+sonorities = Midifile.MapEvents.track_to_sonorities(track, %{
+  chord_tolerance: 10,  # Group notes within 10 ticks as chords
+  ticks_per_quarter_note: sequence.ticks_per_quarter_note
+})
+
+# Analyze the musical content
+Enum.each(sonorities, fn sonority ->
+  case Sonority.type(sonority) do
+    :note -> 
+      IO.puts("Note: #{inspect(sonority.note)}, duration: #{Sonority.duration(sonority)}")
+    :chord -> 
+      note_names = Enum.map(sonority.notes, &inspect(&1.note)) |> Enum.join(", ")
+      IO.puts("Chord: [#{note_names}], duration: #{Sonority.duration(sonority)}")
+    :rest -> 
+      IO.puts("Rest: duration: #{Sonority.duration(sonority)}")
+  end
+end)
+
+# Modify sonorities (e.g., add notes, change durations)
+modified_sonorities = sonorities ++ [
+  Note.new({:C, 5}, duration: 1.0, velocity: 100),
+  Rest.new(0.5),
+  Chord.new([
+    Note.new({:C, 5}, velocity: 90),
+    Note.new({:E, 5}, velocity: 90),
+    Note.new({:G, 5}, velocity: 90)
+  ], 1.0)
+]
+
+# Create a new track from the modified sonorities
+new_track = Midifile.Track.new(
+  "Modified Track", 
+  modified_sonorities, 
+  sequence.ticks_per_quarter_note
+)
+
+# Create a new sequence with the new track
+new_sequence = Midifile.Sequence.new(
+  "Modified Sequence",
+  Midifile.Sequence.bpm(sequence),
+  [new_track],
+  sequence.ticks_per_quarter_note
+)
+
+# Write the new sequence to a MIDI file
+Midifile.write(new_sequence, "output.mid")
 ```
 
 ## Resources
