@@ -1,5 +1,6 @@
 defmodule Midifile.Event do
   alias Midifile.Event
+  alias Midifile.Defaults
   alias Note
   alias Chord
   alias ChordPrims
@@ -19,7 +20,7 @@ defmodule Midifile.Event do
 
   # given a Note and a ticks_per_quarter_note (tpqn) return an :on :off pair of Events
   @spec new(event_type(), Note.t(), integer()) :: [t()]
-  def new(note_type, note, tpqn \\ 960)
+  def new(note_type, note, tpqn \\ Defaults.default_ppqn)
   def new(:note, note, tpqn) do
     midi_note = Note.note_to_midi(note)
     [

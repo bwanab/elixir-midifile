@@ -15,15 +15,14 @@ defmodule Midifile.Sequence do
   alias Midifile.Event
   alias Midifile.Track
   alias Midifile.Sequence
+  alias Midifile.Defaults
 
-  @default_bpm 120
-  @default_ppqn 960
-
+  @microsecs_per_minute 60_000_000
 
   defstruct format: 1,
             # Explicit time basis structure
             time_basis: :metrical_time,  # :metrical_time or :smpte
-            ticks_per_quarter_note: @default_ppqn, # Used when time_basis is :metrical_time
+            ticks_per_quarter_note: Defaults.default_ppqn(), # Used when time_basis is :metrical_time
             smpte_format: nil,           # 24, 25, 29, or 30 - used when time_basis is :smpte
             ticks_per_frame: nil,        # Used when time_basis is :smpte
             # Track structure
@@ -32,7 +31,7 @@ defmodule Midifile.Sequence do
 
   # NOTE: very limited: assumes 4/4 time, no overlapping events on any track.
   @spec new(String.t(), integer(), track_list(), integer() ):: t()
-  def new(name, bpm, tracks, tpqn) do
+  def new(name, bpm, tracks, tpqn \\ Defaults.default_ppqn, ts \\ Defaults.default_time_signature) do
 
     ct = %Track{
       events: [
@@ -40,7 +39,7 @@ defmodule Midifile.Sequence do
         %Midifile.Event{
          symbol: :time_signature,
          delta_time: 0,
-         bytes: [<<4, 2, 24, 8>>]    # 4/4 time
+         bytes: Defaults.time_signature(ts)    # 4/4 time
        },
         %Event{symbol: :tempo, bytes: [trunc(60_000_000 / bpm)]},
         %Midifile.Event{symbol: :track_end, delta_time: 0, bytes: []}
@@ -71,16 +70,16 @@ defmodule Midifile.Sequence do
     end
   end
 
-  def bpm(%Midifile.Sequence{conductor_track: nil}), do: @default_bpm
-  def bpm(%Midifile.Sequence{conductor_track: %Midifile.Track{events: []}}), do: @default_bpm
+  def bpm(%Midifile.Sequence{conductor_track: nil}), do: Defaults.default_bpm
+  def bpm(%Midifile.Sequence{conductor_track: %Midifile.Track{events: []}}), do: Defaults.default_bpm
 
   def bpm(%Midifile.Sequence{conductor_track: %Midifile.Track{events: list}}) do
     case Enum.find(list, &(&1.symbol == :tempo)) do
       %Midifile.Event{bytes: [microsecs_per_beat | _]} ->
-        trunc(60_000_000 / microsecs_per_beat)
+        trunc(@microsecs_per_minute / microsecs_per_beat)
 
       nil ->
-        @default_bpm
+        Defaults.default_bpm
     end
   end
 
@@ -96,7 +95,7 @@ defmodule Midifile.Sequence do
 
   def set_bpm(%Midifile.Sequence{conductor_track: %Midifile.Track{events: list}} = seq, bpm_value)
       when is_integer(bpm_value) do
-    microsecs_per_beat = trunc(60_000_000 / bpm_value)
+    microsecs_per_beat = trunc(@microsecs_per_minute / bpm_value)
 
     updated_events =
       Enum.map(list, fn event ->
@@ -241,7 +240,7 @@ defmodule Midifile.Sequence do
     :binary.decode_unsigned(division_binary)
   end
 
-  def division(_), do: @default_ppqn  # Default if missing or invalid time_basis
+  def division(_), do: Defaults.default_ppqn  # Default if missing or invalid time_basis
 
   @doc """
   Parse a division value from a MIDI file and return appropriate time basis values.
