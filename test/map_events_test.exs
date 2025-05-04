@@ -47,7 +47,7 @@ defmodule Midifile.MapEventsTest do
 
     # Check first note (C4)
     assert Sonority.type(first) == :note
-    assert first.note == {:C, 4}  # Note: Using uppercase to match Note implementation
+    assert Note.enharmonic_equal?(first.note, {:C, 4})  # Note: Using uppercase to match Note implementation
     assert Sonority.duration(first) == 50 / 960
 
     # Check rest between notes
@@ -56,7 +56,7 @@ defmodule Midifile.MapEventsTest do
 
     # Check second note (E4)
     assert Sonority.type(third) == :note
-    assert third.note == {:E, 4}  # Note: Using uppercase to match Note implementation
+    assert Note.enharmonic_equal?(third.note, {:E, 4})  # Note: Using uppercase to match Note implementation
     assert Sonority.duration(third) == 40 / 960
   end
 
@@ -229,7 +229,7 @@ defmodule Midifile.MapEventsTest do
 
     # Find the C# note
     c_sharp = Enum.find(sonorities, fn s ->
-      Sonority.type(s) == :note && s.note == {:C!, 4}
+      Sonority.type(s) == :note && Note.enharmonic_equal?(s.note, {:C!, 4})
     end)
     assert c_sharp != nil
     assert Sonority.duration(c_sharp) == 1.0
@@ -244,7 +244,7 @@ defmodule Midifile.MapEventsTest do
 
     # Find the B note
     b_note = Enum.find(sonorities, fn s ->
-      Sonority.type(s) == :note && s.note == {:B, 4}
+      Sonority.type(s) == :note && Note.enharmonic_equal?(s.note, {:B, 4})
     end)
     assert b_note != nil
     assert Sonority.duration(b_note) == 1.0

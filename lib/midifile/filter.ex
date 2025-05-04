@@ -23,7 +23,7 @@ defmodule Midifile.Filter do
   filtered_sequence = Midifile.Filter.process_notes(
     sequence, 
     1,                                # track number 
-    fn note -> note.note == {:c, 4} end,  # match only C4 notes
+    fn note -> Note.enharmonic_equal?(note.note, {:C, 4}) end,  # match only C4 notes
     :remove                           # remove the notes
   )
   ```
@@ -45,7 +45,7 @@ defmodule Midifile.Filter do
   transposed_sequence = Midifile.Filter.process_notes(
     sequence, 
     0,                                # track number
-    fn note -> note.note == {:e, 4} end,  # match only E4 notes
+    fn note -> Note.enharmonic_equal?(note.note, {:E, 4}) end,  # match only E4 notes
     {:pitch, 3}                       # shift up by 3 semitones (E to G)
   )
 
@@ -64,7 +64,7 @@ defmodule Midifile.Filter do
   sequence_with_adjusted_velocity = Midifile.Filter.process_notes(
     sequence, 
     1,                                # track number
-    fn note -> note.note == {:c, 4} end,  # match only C4 notes
+    fn note -> Note.enharmonic_equal?(note.note, {:C, 4}) end,  # match only C4 notes
     {:velocity, 100}                  # change velocity to 100
   )
 

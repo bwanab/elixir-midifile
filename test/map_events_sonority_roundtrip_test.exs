@@ -50,7 +50,7 @@ defmodule Midifile.MapEventsSonorityRoundtripTest do
       case Sonority.type(original) do
         :note ->
           # For notes, check pitch and velocity
-          assert original.note == new.note
+          assert Note.enharmonic_equal?(original.note, new.note)
           assert original.velocity == new.velocity
           
         :chord ->

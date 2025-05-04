@@ -244,7 +244,7 @@ defmodule Midifile.Util do
     Midifile.Filter.process_notes(
       sequence,
       track_number,
-      fn note -> note == from_note end,
+      fn note -> note == from_note end, # Keep using == for MIDI note numbers
       {:pitch, to_note - from_note}
     )
   end
