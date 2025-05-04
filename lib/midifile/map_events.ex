@@ -28,12 +28,13 @@ defmodule Midifile.MapEvents do
   def track_to_sonorities(track, opts \\ %{}) do
     # Default options
     chord_tolerance = Map.get(opts, :chord_tolerance, 0)
+    tpqn = Map.get(opts, :ticks_per_quarter_note, 960)
 
     # First, calculate absolute start and end times for all notes
     note_events = identify_note_events(track.events)
 
     # Group notes into chords and rests
-    group_into_sonorities(note_events, chord_tolerance)
+    group_into_sonorities(note_events, chord_tolerance, tpqn)
   end
 
   @doc """
@@ -157,9 +158,9 @@ defmodule Midifile.MapEvents do
   ## Returns
     * A list of Sonority protocol implementations (Note, Chord, Rest)
   """
-  def group_into_sonorities(note_events, chord_tolerance) do
+  def group_into_sonorities(note_events, chord_tolerance, tpqn \\ 960) do
     # Find all unique start and end times
-    all_times = 
+    all_times =
       note_events
       |> Enum.flat_map(fn note -> [note.start_time, note.end_time] end)
       |> Enum.uniq()
@@ -177,26 +178,27 @@ defmodule Midifile.MapEvents do
             note.start_time <= prev_time + chord_tolerance && note.end_time >= current_time
           end)
 
+          duration = (current_time - prev_time) / tpqn
           # Create appropriate sonority based on number of active notes
           new_sonority = cond do
             # No notes active - create a Rest
             Enum.empty?(active_notes) ->
-              Rest.new(current_time - prev_time)
+              Rest.new(duration)
 
             # One note active - create a Note
             length(active_notes) == 1 ->
               [note] = active_notes
               # Convert MIDI note to Note struct
-              Note.midi_to_note(note.note, current_time - prev_time, note.velocity)
+              Note.midi_to_note(note.note, duration, note.velocity)
 
             # Multiple notes active - create a Chord
             true ->
               # Convert each MIDI note to a Note struct
               notes = Enum.map(active_notes, fn note ->
-                Note.midi_to_note(note.note, current_time - prev_time, note.velocity)
+                Note.midi_to_note(note.note, duration, note.velocity)
               end)
               # Create chord with the notes
-              Chord.new(notes, current_time - prev_time)
+              Chord.new(notes, duration)
           end
 
           # Only add sonority if it has duration

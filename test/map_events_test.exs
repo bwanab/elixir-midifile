@@ -16,14 +16,14 @@ defmodule Midifile.MapEventsTest do
     note_events = MapEvents.identify_note_events(events)
 
     assert length(note_events) == 2
-    
+
     # Check C4 note
     c4_note = Enum.find(note_events, &(&1.note == 60))
     assert c4_note.start_time == 0
     assert c4_note.end_time == 50  # 0 + 10 + 40
     assert c4_note.velocity == 80
     assert c4_note.channel == 0
-    
+
     # Check E4 note
     e4_note = Enum.find(note_events, &(&1.note == 64))
     assert e4_note.start_time == 10
@@ -42,22 +42,22 @@ defmodule Midifile.MapEventsTest do
 
     # We should have 3 sonorities: Note, Rest, Note
     assert length(sonorities) == 3
-    
+
     [first, second, third] = sonorities
-    
+
     # Check first note (C4)
     assert Sonority.type(first) == :note
     assert first.note == {:C, 4}  # Note: Using uppercase to match Note implementation
-    assert Sonority.duration(first) == 50
-    
+    assert Sonority.duration(first) == 50 / 960
+
     # Check rest between notes
     assert Sonority.type(second) == :rest
-    assert Sonority.duration(second) == 10
-    
+    assert Sonority.duration(second) == 10 / 960
+
     # Check second note (E4)
     assert Sonority.type(third) == :note
     assert third.note == {:E, 4}  # Note: Using uppercase to match Note implementation
-    assert Sonority.duration(third) == 40
+    assert Sonority.duration(third) == 40 / 960
   end
 
   test "group_into_sonorities creates Chords for overlapping notes" do
@@ -71,14 +71,14 @@ defmodule Midifile.MapEventsTest do
 
     # We should have 3 sonorities: Note, Chord(2 notes), Chord(3 notes)
     assert length(sonorities) == 3
-    
+
     [first, second, third] = sonorities
-    
+
     # Check first solo note
     assert Sonority.type(first) == :note
     assert first.note == {:C, 4}  # Note: Using uppercase to match Note implementation
-    assert Sonority.duration(first) == 10
-    
+    assert Sonority.duration(first) == 10 / 960
+
     # Check two-note chord (C4 + E4)
     assert Sonority.type(second) == :chord
     assert length(second.notes) == 2
@@ -86,8 +86,8 @@ defmodule Midifile.MapEventsTest do
     chord_notes = Enum.map(second.notes, & &1.note) |> MapSet.new()
     expected_notes = MapSet.new([{:C, 4}, {:E, 4}])
     assert MapSet.equal?(chord_notes, expected_notes)
-    assert Sonority.duration(second) == 10
-    
+    assert Sonority.duration(second) == 10 / 960
+
     # Check three-note chord (C4 + E4 + G4)
     assert Sonority.type(third) == :chord
     assert length(third.notes) == 3
@@ -95,7 +95,7 @@ defmodule Midifile.MapEventsTest do
     chord_notes = Enum.map(third.notes, & &1.note) |> MapSet.new()
     expected_notes = MapSet.new([{:C, 4}, {:E, 4}, {:G, 4}])
     assert MapSet.equal?(chord_notes, expected_notes)
-    assert Sonority.duration(third) == 80
+    assert Sonority.duration(third) == 80 / 960
   end
 
   test "track_to_sonorities converts MIDI track to sequence of sonorities" do
@@ -111,18 +111,18 @@ defmodule Midifile.MapEventsTest do
       %Event{symbol: :on, delta_time: 100, bytes: [0x90, 72, 80]},  # C5 on
       %Event{symbol: :off, delta_time: 100, bytes: [0x80, 72, 0]}   # C5 off
     ]
-    
+
     track = %Track{events: events}
-    
+
     sonorities = MapEvents.track_to_sonorities(track)
-    
+
     # We should have 5 sonorities: 3 notes, 1 rest, 1 note
     assert length(sonorities) == 5
-    
+
     # Check types
     types = Enum.map(sonorities, &Sonority.type/1)
     assert types == [:note, :note, :note, :rest, :note]
-    
+
     # Check notes
     notes = Enum.filter(sonorities, &(Sonority.type(&1) == :note))
     note_pitches = Enum.map(notes, &(&1.note))
@@ -142,29 +142,29 @@ defmodule Midifile.MapEventsTest do
       %Event{symbol: :on, delta_time: 100, bytes: [0x90, 72, 80]},   # C5 on
       %Event{symbol: :off, delta_time: 100, bytes: [0x80, 72, 0]}    # C5 off
     ]
-    
+
     track = %Track{events: events}
-    
+
     # Test without chord tolerance - should get separate notes
     sonorities_no_tolerance = MapEvents.track_to_sonorities(track, %{chord_tolerance: 0})
     types_no_tolerance = Enum.map(sonorities_no_tolerance, &Sonority.type/1)
     # Without tolerance, we might get a mix of notes and chords depending on timing
     note_and_chord_count = Enum.count(types_no_tolerance, fn t -> t == :note || t == :chord end)
     assert note_and_chord_count >= 2
-    
+
     # Test with chord tolerance - should identify the chord
     sonorities_with_tolerance = MapEvents.track_to_sonorities(track, %{chord_tolerance: 10})
-    
+
     # Should have at least one chord
     types_with_tolerance = Enum.map(sonorities_with_tolerance, &Sonority.type/1)
     assert :chord in types_with_tolerance
-    
+
     # Check that we have a chord with 3 notes
-    chord = Enum.find(sonorities_with_tolerance, fn s -> 
+    chord = Enum.find(sonorities_with_tolerance, fn s ->
       Sonority.type(s) == :chord && length(s.notes) == 3
     end)
     assert chord != nil
-    
+
     # Check the chord notes using MapSet for unordered comparison
     chord_notes = Enum.map(chord.notes, & &1.note) |> MapSet.new()
     expected_notes = MapSet.new([{:C, 4}, {:E, 4}, {:G, 4}])
@@ -179,79 +179,79 @@ defmodule Midifile.MapEventsTest do
       %Event{symbol: :on, delta_time: 100, bytes: [0x90, 64, 80]},  # E4 on
       %Event{symbol: :off, delta_time: 100, bytes: [0x80, 64, 0]}   # E4 off
     ]
-    
+
     track = %Track{events: events}
-    
+
     sonorities = MapEvents.track_to_sonorities(track)
-    
+
     # Basic validation - we should have some sonorities
     assert length(sonorities) > 0
-    
+
     # Validate types - should have notes and possibly rests
     types = Enum.map(sonorities, &Sonority.type/1)
     assert :note in types
-    
+
     # Check the first note - should be a C
     first_note = Enum.find(sonorities, &(Sonority.type(&1) == :note))
     assert first_note.note == {:C, 4}
   end
-  
+
   test "track_to_sonorities processes test_sonorities.mid with all sonority types" do
     # Load the test file that contains examples of all three sonority types
     sequence = Midifile.read("test/test_sonorities.mid")
     track = Enum.at(sequence.tracks, 0)
-    
+
     # Map to sonorities
     sonorities = MapEvents.track_to_sonorities(track)
-    
+
     # Verify we have all three types of sonorities
     types = Enum.map(sonorities, &Sonority.type/1)
     type_counts = Enum.frequencies(types)
-    
+
     assert Map.has_key?(type_counts, :note)
     assert Map.has_key?(type_counts, :chord)
     assert Map.has_key?(type_counts, :rest)
-    
+
     # Verify the specific content - this file should contain:
     # 1. A C major chord (C+E+G)
     # 2. A C# note
     # 3. A D minor chord (D+F+A)
     # 4. A rest
     # 5. A B note
-    
+
     # Find the C major chord
-    c_major = Enum.find(sonorities, fn s -> 
+    c_major = Enum.find(sonorities, fn s ->
       Sonority.type(s) == :chord && length(s.notes) == 3 &&
       Enum.map(s.notes, & &1.note) |> MapSet.new() |> MapSet.equal?(MapSet.new([{:C, 4}, {:E, 4}, {:G, 4}]))
     end)
     assert c_major != nil
-    assert Sonority.duration(c_major) == 960
-    
+    assert Sonority.duration(c_major) == 1.0
+
     # Find the C# note
-    c_sharp = Enum.find(sonorities, fn s -> 
+    c_sharp = Enum.find(sonorities, fn s ->
       Sonority.type(s) == :note && s.note == {:C!, 4}
     end)
     assert c_sharp != nil
-    assert Sonority.duration(c_sharp) == 960
-    
+    assert Sonority.duration(c_sharp) == 1.0
+
     # Find the D minor chord
-    d_minor = Enum.find(sonorities, fn s -> 
+    d_minor = Enum.find(sonorities, fn s ->
       Sonority.type(s) == :chord && length(s.notes) == 3 &&
       Enum.map(s.notes, & &1.note) |> MapSet.new() |> MapSet.equal?(MapSet.new([{:D, 4}, {:F, 4}, {:A, 4}]))
     end)
     assert d_minor != nil
-    assert Sonority.duration(d_minor) == 960
-    
+    assert Sonority.duration(d_minor) == 1.0
+
     # Find the B note
-    b_note = Enum.find(sonorities, fn s -> 
+    b_note = Enum.find(sonorities, fn s ->
       Sonority.type(s) == :note && s.note == {:B, 4}
     end)
     assert b_note != nil
-    assert Sonority.duration(b_note) == 960
-    
+    assert Sonority.duration(b_note) == 1.0
+
     # Find the rest
     rest = Enum.find(sonorities, fn s -> Sonority.type(s) == :rest end)
     assert rest != nil
-    assert Sonority.duration(rest) == 960
+    assert Sonority.duration(rest) == 1.0
   end
 end
