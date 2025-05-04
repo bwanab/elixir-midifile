@@ -5,26 +5,26 @@ defmodule Midifile.MapEvents do
   This module provides functionality to analyze a MIDI track and convert its
   events into a sequence of musical sonorities (Note, Chord, Rest). This higher-level
   representation makes it easier to work with musical concepts rather than raw MIDI events.
-  
+
   The conversion process works in multiple steps:
   1. Identify all note events in the track and calculate their start/end times
   2. Group notes into chords based on timing overlap and tolerance settings
   3. Add rests between sound events
   4. Return chronologically ordered sonorities
-  
+
   These sonorities can then be manipulated, analyzed, or converted back to MIDI events.
-  
+
   ## Example
-  
+
       # Convert MIDI track to sonorities
       sonorities = Midifile.MapEvents.track_to_sonorities(track, %{chord_tolerance: 10})
-      
+
       # Process individual sonorities
       Enum.each(sonorities, fn sonority ->
         case Sonority.type(sonority) do
-          :note -> IO.puts("Note: #{inspect(sonority.note)}")
-          :chord -> IO.puts("Chord with #{length(sonority.notes)} notes")
-          :rest -> IO.puts("Rest: #{Sonority.duration(sonority)} beats")
+          :note -> IO.puts("Note: # {inspect(sonority.note)}")
+          :chord -> IO.puts("Chord with # {length(sonority.notes)} notes")
+          :rest -> IO.puts("Rest: # {Sonority.duration(sonority)} beats")
         end
       end)
   """
@@ -40,7 +40,7 @@ defmodule Midifile.MapEvents do
   - Notes: Single pitches with duration and velocity
   - Chords: Multiple notes sounding together with a common duration
   - Rests: Periods of silence with a duration
-  
+
   The algorithm handles overlapping notes, identifying chords based on timing proximity,
   and properly accounts for rests between sound events.
 
@@ -52,12 +52,12 @@ defmodule Midifile.MapEvents do
 
   ## Returns
     * A list of Sonority protocol implementations (Note, Chord, Rest) in chronological order
-  
+
   ## Examples
-  
+
       # Basic usage with default options
       sonorities = Midifile.MapEvents.track_to_sonorities(track)
-      
+
       # With custom chord tolerance and PPQN
       sonorities = Midifile.MapEvents.track_to_sonorities(track, %{
         chord_tolerance: 10,  # Notes within 10 ticks are considered part of the same chord
@@ -78,11 +78,11 @@ defmodule Midifile.MapEvents do
 
   @doc """
   Identifies all note events in a track and calculates their absolute start/end times.
-  
+
   This function pairs note-on and note-off events to create complete note objects
-  with duration information. It handles both standard note-off events and note-on 
+  with duration information. It handles both standard note-off events and note-on
   events with zero velocity (which are treated as note-offs according to the MIDI spec).
-  
+
   The function also properly handles unmatched note-on events by assigning them
   an end time based on the last event in the track.
 
@@ -96,17 +96,17 @@ defmodule Midifile.MapEvents do
       * `:end_time` - Absolute end time in ticks
       * `:velocity` - The note's velocity (0-127)
       * `:channel` - The MIDI channel (0-15)
-      
+
   ## Examples
-  
+
       # Get all notes from a track with their timing information
       note_events = Midifile.MapEvents.identify_note_events(track.events)
-      
+
       # Print information about each note
       Enum.each(note_events, fn note ->
         duration = note.end_time - note.start_time
-        IO.puts("Note #{note.note} on channel #{note.channel}, " <>
-                "duration: #{duration} ticks, velocity: #{note.velocity}")
+        IO.puts("Note # {note.note} on channel # {note.channel}, " <>
+                "duration: # {duration} ticks, velocity: # {note.velocity}")
       end)
   """
   def identify_note_events(events) do
@@ -208,11 +208,11 @@ defmodule Midifile.MapEvents do
 
   @doc """
   Groups identified notes into sonorities (Notes, Chords, Rests).
-  
+
   This function analyzes the timing relationships between notes to determine when
   notes should be considered as individual notes, as parts of chords, or when
   rests should be inserted between sound events.
-  
+
   The chord_tolerance parameter allows for some flexibility in chord detection.
   Notes that start within the tolerance window will be grouped into a chord,
   even if they don't start at exactly the same time. This is particularly useful
@@ -226,20 +226,20 @@ defmodule Midifile.MapEvents do
 
   ## Returns
     * A list of Sonority protocol implementations (Note, Chord, Rest) in chronological order
-    
+
   ## Examples
-  
+
       # First identify notes
       note_events = Midifile.MapEvents.identify_note_events(track.events)
-      
+
       # Then group them into sonorities with a tolerance of 10 ticks
       sonorities = Midifile.MapEvents.group_into_sonorities(note_events, 10, 960)
-      
+
       # Count the different types of sonorities
       types = Enum.group_by(sonorities, &Sonority.type/1)
-      IO.puts("Found #{length(types[:note] || [])} notes, " <>
-              "#{length(types[:chord] || [])} chords, and " <>
-              "#{length(types[:rest] || [])} rests")
+      IO.puts("Found # {length(types[:note] || [])} notes, " <>
+              "# {length(types[:chord] || [])} chords, and " <>
+              "# {length(types[:rest] || [])} rests")
   """
   def group_into_sonorities(note_events, chord_tolerance, tpqn \\ Defaults.default_ppqn) do
     # Find all unique start and end times
@@ -298,7 +298,7 @@ defmodule Midifile.MapEvents do
 
   @doc false
   # Calculate absolute time for each event based on delta times
-  # 
+  #
   # In MIDI files, event timing is stored as delta times (time since the previous event).
   # This function converts these relative timings to absolute times from the start of the track,
   # which makes it easier to analyze timing relationships between events.
