@@ -44,13 +44,11 @@ defmodule Examples.MidiFromScratch do
   @spec create_sonorities() :: [Sonority.t()]
   def create_sonorities() do
     [
-      # A major chord using enhanced API
-      Chord.from_root_and_quality(:A, :major, 4, 1.0),
-      # D minor chord using enhanced API
-      Chord.from_root_and_quality(:D, :minor, 4, 1.0),
-      Rest.new(1),
-      Note.new({:A, 4}, duration: 1),
-      Note.new({:B, 4}, duration: 1)
+      Note.new({:C, 4}, duration: 1.0),
+      Rest.new(1.0),
+      Chord.new_from_root(:A, :major, 4, 1.0),
+      Note.new({:E, 4}, duration: 1.0),
+      Note.new({:F, 4}, duration: 1.0)
     ]
   end
 
@@ -62,13 +60,13 @@ defmodule Examples.MidiFromScratch do
   def midi_file_from_chord_progression() do
     # Get chord symbols (Roman numerals) from ChordPrims
     roman_numerals = ChordPrims.random_progression(10, 1)
-    
+
     # Use the enhanced Chord API to create chords directly from Roman numerals
     chords = Enum.map(roman_numerals, fn roman_numeral ->
       # Create chord using the new from_roman_numeral function
       Chord.from_roman_numeral(roman_numeral, :C, 4, 4.0)
     end)
-    
+
     write_midi_file(chords, "random_progression")
   end
   @spec write_midi_file([Sonority.t()], binary()) :: :ok
