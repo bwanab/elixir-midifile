@@ -13,6 +13,7 @@ Midifile is an Elixir library for reading, writing, and manipulating standard MI
 - Convert MIDI tracks to musical sonorities (notes, chords, rests)
 - Create MIDI tracks from musical sonorities
 - Support for both metrical time and SMPTE time formats
+- Modern note representation using the Note struct type
 
 ## Installation
 
@@ -177,7 +178,7 @@ sonorities = Midifile.MapEvents.track_to_sonorities(track, %{
 # The returned sonorities can be notes, chords, or rests
 Enum.each(sonorities, fn sonority ->
   case Sonority.type(sonority) do
-    :note -> IO.puts("Note: #{inspect(sonority.note)}, duration: #{Sonority.duration(sonority)}")
+    :note -> IO.puts("Note: #{Note.to_string(sonority)}, duration: #{Sonority.duration(sonority)}")
     :chord -> IO.puts("Chord: #{length(sonority.notes)} notes, duration: #{Sonority.duration(sonority)}")
     :rest -> IO.puts("Rest: duration: #{Sonority.duration(sonority)}")
   end
@@ -194,6 +195,31 @@ bpm = Midifile.Defaults.default_bpm()  # 120 BPM
 ppqn = Midifile.Defaults.default_ppqn()  # 960 pulses per quarter note
 time_sig = Midifile.Defaults.default_time_signature()  # [4, 4] (4/4 time)
 ```
+
+### Note Representation
+
+Notes are represented using the `Note` struct, which provides a modern and type-safe way to work with musical notes:
+
+```elixir
+# Create a new note
+note = Note.new({:C, 4}, duration: 1, velocity: 100)
+
+# Notes can be converted to strings in Guido Music Notation format
+IO.puts(Note.to_string(note))  # Outputs: "C4*1/4"
+
+# Notes can be converted to MIDI note numbers
+midi_number = Note.note_to_midi(note)
+
+# MIDI note numbers can be converted back to notes
+note = Note.midi_to_note(60, 1, 100)  # Creates middle C (C4)
+```
+
+The `Note` struct provides several benefits:
+- Type safety through `Note.t()` type specification
+- Consistent note representation across the codebase
+- Built-in support for duration and velocity
+- Standardized string representation
+- Easy conversion between MIDI note numbers and musical notes
 
 ## How To Use
 
@@ -250,9 +276,9 @@ sonorities = Midifile.MapEvents.track_to_sonorities(track, %{
 Enum.each(sonorities, fn sonority ->
   case Sonority.type(sonority) do
     :note -> 
-      IO.puts("Note: #{inspect(sonority.note)}, duration: #{Sonority.duration(sonority)}")
+      IO.puts("Note: #{Note.to_string(sonority)}, duration: #{Sonority.duration(sonority)}")
     :chord -> 
-      note_names = Enum.map(sonority.notes, &inspect(&1.note)) |> Enum.join(", ")
+      note_names = Enum.map(sonority.notes, &Note.to_string(&1)) |> Enum.join(", ")
       IO.puts("Chord: [#{note_names}], duration: #{Sonority.duration(sonority)}")
     :rest -> 
       IO.puts("Rest: duration: #{Sonority.duration(sonority)}")
