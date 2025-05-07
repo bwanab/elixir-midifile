@@ -63,21 +63,10 @@ defmodule Examples.MidiFromScratch do
     # Get chord symbols (Roman numerals) from ChordPrims
     roman_numerals = ChordPrims.random_progression(10, 1)
     
-    # TODO: Enhance the Chord API to support direct creation from Roman numerals
-    # This would allow a cleaner syntax like:
-    #   Chord.from_roman_numeral(:I, :C, 4, 4.0)  # I chord in C major, octave 4, duration 4.0
-    
-    # First, convert the roman numerals to chord symbols (relative to C major)
-    # Then convert those chord symbols to enhanced chord objects
+    # Use the enhanced Chord API to create chords directly from Roman numerals
     chords = Enum.map(roman_numerals, fn roman_numeral ->
-      # Convert roman numeral to chord symbol
-      chord_sym = ChordPrims.chord_sym_to_chord(roman_numeral, {{:C, 4}, :major})
-      
-      # Extract root and quality from the chord symbol
-      {{root, octave}, quality} = chord_sym
-      
-      # Create chord using enhanced API
-      Chord.from_root_and_quality(root, quality, octave, 4.0)
+      # Create chord using the new from_roman_numeral function
+      Chord.from_roman_numeral(roman_numeral, :C, 4, 4.0)
     end)
     
     write_midi_file(chords, "random_progression")
