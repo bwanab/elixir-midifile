@@ -84,12 +84,10 @@ defmodule Midifile.Sequence do
   end
 
   def set_bpm(%Midifile.Sequence{conductor_track: nil} = seq, _bpm_value) do
-    IO.warn("Cannot set BPM: Sequence has no conductor track")
     seq
   end
 
   def set_bpm(%Midifile.Sequence{conductor_track: %Midifile.Track{events: []}} = seq, _bpm_value) do
-    IO.warn("Cannot set BPM: Conductor track has no events")
     seq
   end
 
