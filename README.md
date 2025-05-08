@@ -201,17 +201,32 @@ time_sig = Midifile.Defaults.default_time_signature()  # [4, 4] (4/4 time)
 Notes are represented using the `Note` struct, which provides a modern and type-safe way to work with musical notes:
 
 ```elixir
-# Create a new note
-note = Note.new({:C, 4}, duration: 1, velocity: 100)
+# Create a new note with default values (duration: 1.0, velocity: 100)
+note = Note.new({:C, 4})
+
+# Create a note with custom duration and velocity
+note = Note.new({:C, 4}, duration: 2.0, velocity: 80)
+
+# Create a note with nil duration and velocity
+note = Note.new({:C, 4}, duration: nil, velocity: nil)
 
 # Notes can be converted to strings in Guido Music Notation format
 IO.puts(Note.to_string(note))  # Outputs: "C4*1/4"
 
 # Notes can be converted to MIDI note numbers
-midi_number = Note.note_to_midi(note)
+midi_number = Note.to_midi(note)
 
 # MIDI note numbers can be converted back to notes
 note = Note.midi_to_note(60, 1, 100)  # Creates middle C (C4)
+
+# Create a rest note
+rest = Note.rest(1.0)  # Creates a rest with duration 1.0
+
+# Check if a value is a valid note
+is_valid = Note.is_note(note)  # Returns true for valid notes
+
+# Convert notes to keyword list format (for backward compatibility)
+keyword_list = Note.to_keyword_list([note1, note2])
 ```
 
 The `Note` struct provides several benefits:
@@ -220,6 +235,75 @@ The `Note` struct provides several benefits:
 - Built-in support for duration and velocity
 - Standardized string representation
 - Easy conversion between MIDI note numbers and musical notes
+- Support for both sharp and flat note names
+- Enharmonic equivalence checking
+- Circle of fifths and fourths navigation
+- Chromatic scale generation
+- Octave manipulation
+
+### Note Operations
+
+The `Note` module provides various operations for working with notes:
+
+```elixir
+# Get the next note in the circle of fifths
+next_fifth = Note.next_fifth(note)
+
+# Get the next note in the circle of fourths
+next_fourth = Note.next_fourth(note)
+
+# Get the next half step up
+next_half = Note.next_half_step(note)
+
+# Move notes up or down an octave
+octave_up = Note.octave_up(note)
+octave_down = Note.bump_octave(note, :down)
+
+# Move a specific note in a sequence up or down an octave
+adjusted_notes = Note.bump_octave(notes, 2, :up)  # Move third note up an octave
+
+# Generate a chromatic scale starting from a note
+chromatic = Note.chromatic_scale(note)
+
+# Check if two notes are enharmonically equal
+is_equal = Note.enharmonic_equal?(note1, note2)
+
+# Map notes between sharp and flat representations
+sharp_note = Note.map_by_sharp_key(note)
+flat_note = Note.map_by_flat_key(note)
+
+# Rotate a sequence of notes
+rotated = Note.rotate_notes(notes, 2)  # Rotate by 2 positions
+```
+
+### Chord Operations
+
+The `Chord` module provides functions for working with chords:
+
+```elixir
+# Create a chord from a root note and quality
+chord = Chord.new_from_root(:C, :major, 4, 1.0, 0)  # C major in octave 4, duration 1.0, no inversion
+
+# Create a chord from a Roman numeral
+chord = Chord.from_roman_numeral(:I, :C, 4, 1.0, :major, 0)  # I chord in C major
+
+# Get chord inversions
+first_inv = Chord.first_inversion(chord)
+second_inv = Chord.second_inversion(chord)
+third_inv = Chord.third_inversion(chord)
+
+# Check if a chord's root is enharmonically equal to a note
+is_equal = Chord.has_root_enharmonic_with?(chord, :Eb)
+
+# Add a bass note to create a slash chord
+slash_chord = Chord.with_bass(chord, {:G, 3})
+
+# Add additional notes to the chord
+extended_chord = Chord.with_additions(chord, [note1, note2])
+
+# Specify notes to omit from the chord
+omitted_chord = Chord.with_omissions(chord, [1])  # Omit the root
+```
 
 ## How To Use
 

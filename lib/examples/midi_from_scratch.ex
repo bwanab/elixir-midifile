@@ -2,7 +2,8 @@ defmodule Examples.MidiFromScratch do
   alias Midifile.Track
   alias Midifile.Sequence
   alias Midifile.Writer
-  import MusicPrims
+  import Scale
+  alias Rest
 
   # creates a C major scale where each note has a duration of 1 quarter note and writes it to a midifile.
   def midifile_from_scratch() do
@@ -85,7 +86,7 @@ defmodule Examples.MidiFromScratch do
   end
   @spec add_rest_at([Sonority.t()], integer(), any()) :: {Sonority.t(), float()}
   def add_rest_at(ms, pos, duration) do
-    ms = List.insert_at(ms, pos, Note.rest(duration))
+    ms = List.insert_at(ms, pos, Rest.new(duration))
     total_dur = Enum.reduce(ms, 0,  &(&1.duration + &2))
     {ms, total_dur}
   end

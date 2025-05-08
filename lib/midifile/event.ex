@@ -40,7 +40,7 @@ defmodule Midifile.Event do
 
   @spec new(event_type(), Chord.t(), integer()) :: [t()]
   def new(:chord, chord, tpqn) when chord.notes == nil do
-    [first | others] = ChordPrims.chord_to_notes(chord.chord)
+    [first | others] = Chord.chord_to_notes(chord.chord)
     first_event = first_chord_note(first, chord.duration, tpqn)
     other_events = Enum.map(others, &(other_chord_notes(&1)))
     raw = [first_event | other_events]
@@ -59,7 +59,7 @@ defmodule Midifile.Event do
     # events at the start and all the :off events at the end.
     Enum.map(raw, &(Enum.at(&1, 0))) ++ Enum.map(raw, &(Enum.at(&1, 1)))
   end
-  
+
   @spec new(event_type(), Chord.t(), integer()) :: [t()]
   def new(:chord, chord, tpqn) do
     # For the enhanced chord API, get the notes using to_notes()
