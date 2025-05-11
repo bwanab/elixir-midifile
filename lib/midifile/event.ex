@@ -1,10 +1,4 @@
 defmodule Midifile.Event do
-  alias Midifile.Event
-  alias Midifile.Defaults
-  alias Note
-  alias Chord
-  alias ChordPrims
-  alias Rest
 
   @type event_type :: :note | :on | :off | :pitch_bend | :controller | :tempo | :time_signature | :track_end | :seq_name
   @type t :: %__MODULE__{
@@ -18,54 +12,6 @@ defmodule Midifile.Event do
     delta_time: 0,
     bytes: []                   # data bytes, including status byte
 
-  # given a Note and a ticks_per_quarter_note (tpqn) return an :on :off pair of Events
-  @spec new(event_type(), Note.t(), integer()) :: [t()]
-  def new(note_type, note, tpqn \\ Defaults.default_ppqn)
-  def new(:note, note, tpqn) do
-    midi_note = Note.note_to_midi(note)
-    [
-      %Midifile.Event{symbol: :on, delta_time: 0, bytes: [144, midi_note.note_number, midi_note.velocity]},
-      %Midifile.Event{symbol: :off, delta_time: round(tpqn * midi_note.duration), bytes: [128, midi_note.note_number, 0]}
-    ]
-  end
-
-    # given a Note and a ticks_per_quarter_note (tpqn) return an :on :off pair of Events
-  @spec new(event_type, Rest.t(), integer()) :: [t()]
-  def new(:rest, note, tpqn) do
-    [
-      %Midifile.Event{symbol: :off, delta_time: round(tpqn * note.duration), bytes: [128, 0, 0]}
-    ]
-  end
-
-
-  @spec new(event_type(), Chord.t(), integer()) :: [t()]
-  def new(:chord, chord, tpqn) do
-    # For the enhanced chord API, get the notes using to_notes()
-    notes = Chord.to_notes(chord)
-    [first | others] = notes
-    first_event = first_chord_note(first, chord.duration, tpqn)
-    other_events = Enum.map(others, &(other_chord_notes(&1)))
-    raw = [first_event | other_events]
-    # raw is now a list of :on :off pairs, we want to gather all the :on
-    # events at the start and all the :off events at the end.
-    Enum.map(raw, &(Enum.at(&1, 0))) ++ Enum.map(raw, &(Enum.at(&1, 1)))
-  end
-
-  @spec new(event_type(), Chord.t(), integer()) :: [t()]
-  def new(:arpeggio, arpeggio, tpqn) do
-    # For the enhanced chord API, get the notes using to_notes()
-    notes = Arpeggio.to_notes(arpeggio)
-    Enum.map(notes, &(Event.new(:note, &1, tpqn)))
-  end
-
-
-  def first_chord_note(%Note{note: n, velocity: v}, duration, tpqn) do
-    Event.new(:note, Note.new(n, duration: duration, velocity: v), tpqn)
-  end
-
-  def other_chord_notes(%Note{note: n, velocity: v}) do
-    Event.new(:note, Note.new(n, duration: 0, velocity: v))
-  end
   def status(%Midifile.Event{bytes: [st|_]}) when st < 0xf0, do: band(st, 0xf0)
   def status(%Midifile.Event{bytes: [st|_]}), do: st
 

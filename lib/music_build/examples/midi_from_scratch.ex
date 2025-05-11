@@ -1,7 +1,7 @@
-defmodule Examples.MidiFromScratch do
-  alias Midifile.Track
+defmodule MusicBuild.Examples.MidiFromScratch do
   alias Midifile.Sequence
   alias Midifile.Writer
+  alias MusicBuild.TrackBuilder
   import Scale
   alias Rest
   alias Arpeggio
@@ -29,7 +29,6 @@ defmodule Examples.MidiFromScratch do
     sonorities = create_sonorities()
     write_midi_file(sonorities, "with chords")
   end
-
 
   def midi_file_from_arpeggio() do
     arpeggio = Arpeggio.new(Chord.new_from_root(:C, :major, 4, 1.0), :up, 4)
@@ -59,7 +58,6 @@ defmodule Examples.MidiFromScratch do
     ]
   end
 
-
   # this creates a chord sequence with 10 measures. There is randomness in the computation of the series,
   # but it is built on a foundation of logical chord sequences so add this to a midi player with an
   # appropriate string/organ/brass like instrument and it should sound pleasing albeit possibly incipid.
@@ -79,7 +77,7 @@ defmodule Examples.MidiFromScratch do
 
   @spec write_midi_file([Sonority.t()], binary()) :: :ok
   def write_midi_file(notes, name) do
-    track = Track.new(name, notes, 960)
+    track = TrackBuilder.new(name, notes, 960)
     sfs = Sequence.new(name, 110, [track], 960)
     Writer.write(sfs, "test/#{name}.mid")
   end
@@ -91,6 +89,7 @@ defmodule Examples.MidiFromScratch do
     {ms, _td} = change_dur_at(ms, pos, note.duration - duration)
     add_rest_at(ms, pos + 1, duration)
   end
+
   @spec add_rest_at([Sonority.t()], integer(), any()) :: {Sonority.t(), float()}
   def add_rest_at(ms, pos, duration) do
     ms = List.insert_at(ms, pos, Rest.new(duration))

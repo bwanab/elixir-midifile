@@ -11,8 +11,8 @@ defmodule Midifile.Track do
 
   ## Examples
 
-      # Create a track from musical sonorities
-      track = Midifile.Track.new("Piano", sonorities)
+      # Create a track from MIDI events
+      track = Midifile.Track.new("Piano", events)
 
       # Get the instrument name for the track
       instrument = Midifile.Track.instrument(track)
@@ -26,50 +26,37 @@ defmodule Midifile.Track do
     events: list()
   }
 
-  alias Midifile.Defaults
   alias Midifile.Event
 
   defstruct name: "Unnamed",
     events: []
 
   @doc """
-  Creates a new track from a list of sonorities.
-
-  This function converts high-level musical sonorities (notes, chords, rests)
-  into low-level MIDI events and assembles them into a properly formatted track.
-  The track will include a name event at the beginning and an end-of-track event.
+  Creates a new track from a list of MIDI events.
 
   ## Parameters
 
     * `name` - String name for the track
-    * `sonorities` - List of sonority protocol implementations (Note, Chord, Rest)
-    * `tpqn` - Ticks per quarter note, defines the time resolution (default: 960)
+    * `events` - List of MIDI events
 
   ## Returns
 
-    * A new `Midifile.Track` struct containing the converted events
+    * A new `Midifile.Track` struct containing the events
 
   ## Examples
 
-      # Create a track with a C major scale
-      notes = [
-        Note.new({:C, 4}, duration: 1.0),
-        Note.new({:D, 4}, duration: 1.0),
-        Note.new({:E, 4}, duration: 1.0),
-        Note.new({:F, 4}, duration: 1.0),
-        Note.new({:G, 4}, duration: 1.0),
-        Note.new({:A, 4}, duration: 1.0),
-        Note.new({:B, 4}, duration: 1.0),
-        Note.new({:C, 5}, duration: 1.0)
+      # Create a track with MIDI events
+      events = [
+        %Event{symbol: :on, delta_time: 0, bytes: [144, 60, 100]},
+        %Event{symbol: :off, delta_time: 480, bytes: [128, 60, 0]}
       ]
 
-      track = Midifile.Track.new("C Major Scale", notes, 960)
+      track = Midifile.Track.new("Piano", events)
   """
-  @spec new(String.t(), [Sonority], integer()) :: t()
-  def new(name, sonorities, tpqn \\ Defaults.default_ppqn) do
-    e1 = [%Midifile.Event{symbol: :seq_name, delta_time: 0, bytes: name}]
-    events = Enum.map(sonorities, &(Midifile.Event.new(Sonority.type(&1), &1, tpqn)))
-    e_last = [%Midifile.Event{symbol: :track_end, delta_time: 0, bytes: []}]
+  @spec new(String.t(), [Event.t()]) :: t()
+  def new(name, events) do
+    e1 = [%Event{symbol: :seq_name, delta_time: 0, bytes: name}]
+    e_last = [%Event{symbol: :track_end, delta_time: 0, bytes: []}]
 
     %Midifile.Track{
       name: name,
