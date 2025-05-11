@@ -4,6 +4,7 @@ defmodule Examples.MidiFromScratch do
   alias Midifile.Writer
   import Scale
   alias Rest
+  alias Arpeggio
 
   # creates a C major scale where each note has a duration of 1 quarter note and writes it to a midifile.
   def midifile_from_scratch() do
@@ -25,23 +26,28 @@ defmodule Examples.MidiFromScratch do
   # BTW: Dialyzer complains about this function, but it compiles and works correctly.
   @spec midi_file_mixed_chords_notes_rests() :: :ok
   def midi_file_mixed_chords_notes_rests() do
-    write_midi_file(create_sonorities(), "with chords")
+    sonorities = create_sonorities()
+    write_midi_file(sonorities, "with chords")
   end
 
-  # for reasons that I can't fathom, dialyzer thinks this is the correct spec of this function instead
-  # of the one that is on it.
-  #
-  # @spec create_sonorities() :: [
-  #         %{
-  #           :__struct__ => Chord | Note | Rest,
-  #           :duration => any(),
-  #           optional(:chord) => {{any(), any()}, atom()},
-  #           optional(:note) => any(),
-  #           optional(:notes) => [Note],
-  #           optional(:velocity) => any()
-  #         },
-  #         ...
-  #       ]
+
+  def midi_file_from_arpeggio() do
+    arpeggio = Arpeggio.new(Chord.new_from_root(:C, :major, 4, 1.0), :up, 4)
+    write_midi_file(Arpeggio.to_notes(arpeggio), "arpeggio")
+  end
+
+  # this is an example of building a sequence of arpeggios that are repeated.
+  # it is actually somewhat musical.
+  def midi_file_from_arpeggio_repeated() do
+    arpeggio1 = Arpeggio.repeat(Arpeggio.new(Chord.new_from_root(:C, :minor, 4, 1.0), :up, 1), 4)
+    arpeggio2 = Arpeggio.repeat(Arpeggio.new(Chord.new_from_root(:F, :minor, 4, 1.0), :up, 1), 4)
+    arpeggio3 = Arpeggio.repeat(Arpeggio.new(Chord.new_from_root(:Ab, :major, 3, 1.0), :up, 1), 4)
+    arpeggio4 = Arpeggio.repeat(Arpeggio.new(Chord.new_from_root(:G, :minor, 3, 1.0), :up, 1), 4)
+    sonorities = [arpeggio1, arpeggio2, arpeggio3, arpeggio4]
+    sonorities = List.duplicate(sonorities, 4) |> List.flatten()
+    write_midi_file(sonorities, "multiple_arpeggios_repeated")
+  end
+
   @spec create_sonorities() :: [Sonority.t()]
   def create_sonorities() do
     [
@@ -70,6 +76,7 @@ defmodule Examples.MidiFromScratch do
 
     write_midi_file(chords, "random_progression")
   end
+
   @spec write_midi_file([Sonority.t()], binary()) :: :ok
   def write_midi_file(notes, name) do
     track = Track.new(name, notes, 960)

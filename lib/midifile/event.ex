@@ -38,28 +38,6 @@ defmodule Midifile.Event do
   end
 
 
-  # @spec new(event_type(), Chord.t(), integer()) :: [t()]
-  # def new(:chord, chord, tpqn) do # when chord.notes == nil do
-  #   [first | others] = Chord.chord_to_notes(chord.chord)
-  #   first_event = first_chord_note(first, chord.duration, tpqn)
-  #   other_events = Enum.map(others, &(other_chord_notes(&1)))
-  #   raw = [first_event | other_events]
-  #   # raw is now a list of :on :off pairs, we want to gather all the :on
-  #   # events at the start and all the :off events at the end.
-  #   Enum.map(raw, &(Enum.at(&1, 0))) ++ Enum.map(raw, &(Enum.at(&1, 1)))
-  # end
-
-  # @spec new(event_type(), Chord.t(), integer()) :: [t()]
-  # def new(:chord, chord, tpqn) when chord.chord == nil do
-  #   [first | others] = chord.notes
-  #   first_event = first_chord_note(first, chord.duration, tpqn)
-  #   other_events = Enum.map(others, &(other_chord_notes(&1)))
-  #   raw = [first_event | other_events]
-  #   # raw is now a list of :on :off pairs, we want to gather all the :on
-  #   # events at the start and all the :off events at the end.
-  #   Enum.map(raw, &(Enum.at(&1, 0))) ++ Enum.map(raw, &(Enum.at(&1, 1)))
-  # end
-
   @spec new(event_type(), Chord.t(), integer()) :: [t()]
   def new(:chord, chord, tpqn) do
     # For the enhanced chord API, get the notes using to_notes()
@@ -71,6 +49,13 @@ defmodule Midifile.Event do
     # raw is now a list of :on :off pairs, we want to gather all the :on
     # events at the start and all the :off events at the end.
     Enum.map(raw, &(Enum.at(&1, 0))) ++ Enum.map(raw, &(Enum.at(&1, 1)))
+  end
+
+  @spec new(event_type(), Chord.t(), integer()) :: [t()]
+  def new(:arpeggio, arpeggio, tpqn) do
+    # For the enhanced chord API, get the notes using to_notes()
+    notes = Arpeggio.to_notes(arpeggio)
+    Enum.map(notes, &(Event.new(:note, &1, tpqn)))
   end
 
 
