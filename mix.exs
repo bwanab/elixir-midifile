@@ -28,7 +28,6 @@ defmodule Midifile.Mixfile do
 
   defp deps do
     [
-      # {:music_prims, path: "../music_prims"},
       {:dialyxir, "~> 1.4", only: [:dev], runtime: false}
     ]
   end
