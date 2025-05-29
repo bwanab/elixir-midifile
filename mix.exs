@@ -5,7 +5,7 @@ defmodule Midifile.Mixfile do
     [
       app: :midifile,
       version: "1.0.0",
-      elixir: "~> 1.13",
+      elixir: "~> 1.18",
       deps: deps(),
       description: "Library for working with MIDI files in Elixir",
       package: package()
@@ -22,7 +22,7 @@ defmodule Midifile.Mixfile do
   defp package do
     [
       licenses: ["MIT"],
-      links: %{"GitHub" => "https://github.com/user/elixir-midifile"}
+      links: %{"GitHub" => "https://github.com/bwanab/elixir-midifile"}
     ]
   end
 
