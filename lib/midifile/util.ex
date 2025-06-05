@@ -157,7 +157,7 @@ defmodule Midifile.Util do
   ## Returns
     * The path to the output file
   """
-  def map_drums(map_file_path, input_path, output_path \\ nil) do
+  def map_drums(map_file_path, track_num, input_path, output_path \\ nil) do
     # Set default output path if none provided
     output_file =
       if output_path do
@@ -172,30 +172,36 @@ defmodule Midifile.Util do
     # Read the input MIDI file - our Reader now handles format 0 files
     sequence = Midifile.read(input_path)
 
-    # Read and parse the mapping CSV file
-    mappings = read_mappings(map_file_path)
-
-    # Process all tracks in the sequence
-    updated_tracks =
-      Enum.map(0..(length(sequence.tracks) - 1), fn track_idx ->
-        # Apply each mapping in the CSV file to the track
-        processed_sequence =
-          Enum.reduce(mappings, sequence, fn {_item, from_note, to_note}, seq ->
-            map_drum_note(seq, track_idx, from_note, to_note)
-          end)
-
-        # Get the processed track
-        Enum.at(processed_sequence.tracks, track_idx)
-      end)
-
-    # Create a new sequence with all processed tracks
-    updated_sequence = %{sequence | tracks: updated_tracks}
+    updated_sequence = map_drums_in_sequence(sequence, map_file_path, track_num)
 
     # Write the processed sequence to the output file
     Midifile.write(updated_sequence, output_file)
 
     # Return the output file path
     output_file
+  end
+
+  def map_drums_in_sequence(sequence, map_file_path, track_num) do
+    mappings = read_mappings(map_file_path)
+
+    processed_sequence =
+      Enum.reduce(mappings, sequence, fn {_item, from_note, to_note}, seq ->
+        map_drum_note(seq, track_num, from_note, to_note)
+      end)
+
+    updated_tracks = processed_sequence.tracks
+
+    # Create a new sequence with all processed tracks
+    %{sequence | tracks: updated_tracks}
+  end
+
+  def transpose(sequence, track_num, val) do
+    Midifile.Filter.process_notes(
+      sequence,
+      track_num,
+      fn _ -> true end,
+      {:pitch, val}
+    )
   end
 
   @doc """
