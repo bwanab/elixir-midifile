@@ -9,7 +9,7 @@ defmodule Midifile.Reader do
   @moduledoc """
   MIDI file reader.
   """
-  
+
   @debug false
 
   # Channel messages
@@ -53,94 +53,94 @@ defmodule Midifile.Reader do
     [{:header, format, division}, num_tracks] = parse_header(:file.pread(f, pos, 10))
     tracks = read_tracks(f, num_tracks, pos + 10, [])
     File.close(f)
-    
+
     # Parse the division value to determine time basis and related values
     time_basis_values = Sequence.parse_division(division)
-    
+
     case {format, tracks} do
       # Format 0: Single track containing all MIDI data
       {0, [single_track]} ->
         # Extract metadata events for conductor track
         {meta_events, content_events} = split_track_events(single_track.events)
-        
+
         # Create conductor track with metadata
         conductor_track = %Track{name: "Conductor Track", events: meta_events}
-        
+
         # Create content track with the remaining events
         content_track = %Track{name: single_track.name, events: content_events}
-        
+
         # Return a format 1 sequence
         %Sequence{
-          format: 1, 
+          format: 1,
           # Set the time basis properties
           time_basis: time_basis_values.time_basis,
           ticks_per_quarter_note: time_basis_values.ticks_per_quarter_note,
           smpte_format: time_basis_values.smpte_format,
           ticks_per_frame: time_basis_values.ticks_per_frame,
           # Set tracks
-          conductor_track: conductor_track, 
+          conductor_track: conductor_track,
           tracks: [content_track]
         }
-                  
+
       # Format 1: Multiple tracks with first track as conductor
       {1, [conductor_track | remaining_tracks]} ->
         %Sequence{
-          format: format, 
+          format: format,
           # Set the time basis properties
           time_basis: time_basis_values.time_basis,
           ticks_per_quarter_note: time_basis_values.ticks_per_quarter_note,
           smpte_format: time_basis_values.smpte_format,
           ticks_per_frame: time_basis_values.ticks_per_frame,
           # Set tracks
-          conductor_track: conductor_track, 
+          conductor_track: conductor_track,
           tracks: remaining_tracks
         }
-                  
+
       # Other cases (should not normally occur)
       {_, tracks} ->
         [conductor_track | remaining_tracks] = tracks
         %Sequence{
-          format: format, 
+          format: format,
           # Set the time basis properties
           time_basis: time_basis_values.time_basis,
           ticks_per_quarter_note: time_basis_values.ticks_per_quarter_note,
           smpte_format: time_basis_values.smpte_format,
           ticks_per_frame: time_basis_values.ticks_per_frame,
           # Set tracks
-          conductor_track: conductor_track, 
+          conductor_track: conductor_track,
           tracks: remaining_tracks
         }
     end
   end
-  
+
   # Splits a track's events into metadata events (for conductor track) and content events
   defp split_track_events(events) do
     # Find track name if it exists
     track_name_event = Enum.find(events, fn event -> event.symbol == :seq_name end)
-    
+
     # Extract metadata events - tempo, time signature, key signature, etc.
     meta_events = events
-                  |> Enum.filter(fn event -> 
+                  |> Enum.filter(fn event ->
                        event.symbol in [:tempo, :time_signature, :key_signature, :track_end]
                      end)
-    
+
     # Add track name to metadata if found
     meta_events = if track_name_event, do: [track_name_event | meta_events], else: meta_events
-    
+
     # Get non-metadata events for content track (exclude meta events that went to conductor)
-    content_events = events 
-                     |> Enum.filter(fn event -> 
+    content_events = events
+                     |> Enum.filter(fn event ->
                           not (event.symbol in [:tempo, :time_signature, :key_signature]) and
                           (event != track_name_event)
                         end)
-    
+
     # Ensure both tracks have track_end events
     meta_events = ensure_track_end(meta_events)
     content_events = ensure_track_end(content_events)
-    
+
     {meta_events, content_events}
   end
-  
+
   # Ensures a track has a track_end event
   defp ensure_track_end(events) do
     has_track_end = Enum.any?(events, fn event -> event.symbol == :track_end end)
@@ -331,12 +331,12 @@ defmodule Midifile.Reader do
       @meta_sequencer_specific ->
         debug("@meta_sequencer_specific")
         {%Event{symbol: :seq_name, delta_time: delta_time, bytes: [data]}, total_length}
-      unknown ->
+      _unknown ->
         debug("unknown meta")
-        IO.puts("unknown == #{unknown}") # DEBUG
+        #IO.puts("unknown == #{unknown}") # DEBUG
         {%Event{symbol: :unknown_meta, delta_time: delta_time, bytes: [type, data]}, total_length}
     end
-    
+
     {event, bytes} = event_and_bytes
     {event, bytes, new_state}
   end
