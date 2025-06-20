@@ -208,6 +208,11 @@ defmodule Midifile.Reader do
     bytes_to_read
   end
 
+  def parse_event(delta_time, data) do
+    read_event(0, 0, delta_time, data, %{})
+  end
+
+
   defp event_list(_f, _pos, 0, events, state) do
     debug("event_list")
     {Enum.reverse(events), state}
